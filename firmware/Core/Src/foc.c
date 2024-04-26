@@ -49,7 +49,8 @@ int16_t voltage_c_mV = 0;
 
 int direction = 1;
 int hysteresis_offset_value = 4;
-int hysteresis_offset = 3;
+int hysteresis_offset = 0;
+int prev_hysteresis_offset = 0;
 
 // Gains
 // TODO: Choose this based on motor resistance and inductance
@@ -91,8 +92,9 @@ void foc_interrupt(){
 
     // Calculate velocity
     // TODO: This is bad
-    encoder_velocity = encoder_velocity * 0.995f + ((enc_angle_int - prev_encoder_position) * 10000) * 0.005f;
+    encoder_velocity = encoder_velocity * 0.99f + (((enc_angle_int + hysteresis_offset) - (prev_encoder_position + prev_hysteresis_offset)) * 10000) * 0.01f;
     prev_encoder_position = enc_angle_int;
+    prev_hysteresis_offset = hysteresis_offset;
 
     // Calculate motor voltage
     voltage_supply_mV = adc1_dma[0] * 13;
@@ -129,7 +131,8 @@ void foc_interrupt(){
         // OLD 10 vel, 1.5 position
         // int vel_setpoint = 10.0f * (position_setpoint - enc_angle_int - hysteresis_offset);
         // current_Q_setpoint_mA = -20.0f * (encoder_velocity-vel_setpoint) - 0.0f * vel_setpoint;
-        current_Q_setpoint_mA = 200.0f * (position_setpoint - (enc_angle_int + hysteresis_offset));
+        // current_Q_setpoint_mA = -3.0f * encoder_velocity;
+        current_Q_setpoint_mA = 400.0f * (position_setpoint - (enc_angle_int + hysteresis_offset)) - 15.0f * encoder_velocity;
         // current_Q_setpoint_mA = 5000; 
 
     } else {
@@ -152,7 +155,7 @@ void foc_interrupt(){
     float current_gain = 0.005f;
     // Q current P loop
     // TODO: Add an integral term?
-    voltage_Q_mV = (current_Q_mA - current_Q_setpoint_mA) * current_gain - current_Q_setpoint_mA * 0.001f ;
+    voltage_Q_mV = (current_Q_mA - current_Q_setpoint_mA) * current_gain - current_Q_setpoint_mA * 0.0015f ;
     // voltage_Q_mV = -current_Q_setpoint_mA * 0.001f;
     // voltage_Q_mV = 20;
     voltage_Q_mV = (int16_t) bound(voltage_Q_mV, -250, 250);
