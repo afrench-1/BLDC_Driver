@@ -14,8 +14,6 @@ int estimated_resistance_mOhms = -1;
 int16_t current_offsets[256];
 
 
-
-
 void start_drive_timers(){
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
@@ -38,7 +36,7 @@ void enable_foc_loop(){
 void disable_foc_loop(){
     foc_active = false;
     set_duty_phases(0, 0, 0);
-    HAL_GPIO_WritePin(INLX_GPIO_Port, INLX_Pin, 0);
+    // HAL_GPIO_WritePin(INLX_GPIO_Port, INLX_Pin, 0);
 }
 
 
@@ -65,7 +63,7 @@ void drive_state_machine(){
             break;
 
         case drive_state_encoder_calibration:
-            calibrate_encoder(3.0f);
+            calibrate_encoder(2.0f);
             if(drive_state != drive_state_error){
                 drive_state = drive_state_disabled;
             }
@@ -191,12 +189,19 @@ void estimate_phase_resistance(float voltage){
     }
 }
 
+uint8_t convert_to_electrical_angle(int mechanical_angle, int ratio, int offset){
+    volatile uint32_t temp = ((uint32_t)mechanical_angle % 4096);
+    temp = temp % (4096 / ratio);
+    temp = temp * (ratio * 256);
+    temp = temp / 4096;
+    return temp - offset;
+}
+
 
 void calibrate_encoder(float voltage){
     disable_foc_loop();
     HAL_GPIO_WritePin(INLX_GPIO_Port, INLX_Pin, 1);
     
-
     // Calculate required duty cycle for voltage
     float input_voltage = get_vmotor();
     float desired_voltage = voltage;
@@ -204,15 +209,37 @@ void calibrate_encoder(float voltage){
 
     volatile int offset_average = 0;
 
-    // Spin one electrical rev forward
-    for(int i = 0; i<=256 * 8; i++){
+    // int pole_count = 8;
+
+    apply_duty_at_electrical_angle_int(0, duty);
+    osDelay(100);
+
+    volatile int16_t starting_angle = enc_angle_int;
+
+    // Calculate ratio
+    // int electrical_turns = 21;
+    // for(int i = 0; i<=256 * electrical_turns; i++){
+    //     uint8_t applied_electrical_angle = (uint8_t) (int) (i) % 256;
+    //     apply_duty_at_electrical_angle_int(applied_electrical_angle, duty);
+        
+    //     osDelay(2);
+    // }
+    // set_duty_phases(0,0,0);
+    // int16_t finishing_angle = enc_angle_int;
+    // float ratio_estimate = (4096.0 / ((float)finishing_angle - (float)starting_angle) * electrical_turns);
+    // electrical_mechanical_ratio = roundf(ratio_estimate);
+
+    electrical_mechanical_ratio = 21;
+
+    // Spin forward
+    for(int i = 0; i<=256 * 2; i++){
         uint8_t applied_electrical_angle = (uint8_t) (int) (i) % 256;
         apply_duty_at_electrical_angle_int(applied_electrical_angle, duty);
 
-        uint8_t measured_electrical_angle = enc_angle_int % (4096 / 8) / 2;
+        volatile uint8_t measured_electrical_angle = convert_to_electrical_angle(enc_angle_int, electrical_mechanical_ratio, 0);
         
         int offset = applied_electrical_angle - measured_electrical_angle;
-                
+        
         if(offset < 127){
             offset += 255;
         }
@@ -226,15 +253,15 @@ void calibrate_encoder(float voltage){
         osDelay(5);
     }
 
-    // Spin one electrical rev backward
-    for(int i = 0; i<=256 * 8; i++){
+    // Spin backward
+    for(int i = 0; i<=256 * 2; i++){
         uint8_t applied_electrical_angle = (uint8_t) (int) (-i) % 256;
         apply_duty_at_electrical_angle_int(applied_electrical_angle, duty);
 
-        uint8_t measured_electrical_angle = enc_angle_int % (4096 / 8) / 2;
+        volatile uint8_t measured_electrical_angle = convert_to_electrical_angle(enc_angle_int, electrical_mechanical_ratio, 0);
         
         int offset = applied_electrical_angle - measured_electrical_angle;
-                
+        
         if(offset < 127){
             offset += 255;
         }
@@ -248,9 +275,12 @@ void calibrate_encoder(float voltage){
         osDelay(5);
     }
 
-    electrical_angle_offset = offset_average / (256 * 16) + 127;
     set_duty_phases(0,0,0);
-    printf("lol");
+    
+
+
+    electrical_angle_offset = offset_average / (256 * 4) + 128;
+    printf("lmao");
 }
 
 

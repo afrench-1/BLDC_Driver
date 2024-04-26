@@ -461,17 +461,17 @@ void handle_telemetry_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
 
     if(msg_type == TELEM_MOTOR_POSITION){
         uint8_t array[] = {TELEM_MOTOR_POSITION, 
-                            (enc_angle_int) & 0xFF, 
-                            (enc_angle_int >> 8) & 0xFF,
-                            (enc_angle_int >> 16) & 0xFF};
+                            ((enc_angle_int + hysteresis_offset)) & 0xFF, 
+                            ((enc_angle_int + hysteresis_offset) >> 8) & 0xFF,
+                            ((enc_angle_int + hysteresis_offset) >> 16) & 0xFF};
         CAN_Transmit_Array(array, 4);
     }
 
     if(msg_type == TELEM_MOTOR_VELOCITY){
         uint8_t array[] = {TELEM_MOTOR_VELOCITY, 
-                            (encoder_velocity) & 0xFF, 
-                            (encoder_velocity >> 8) & 0xFF,
-                            (encoder_velocity >> 16) & 0xFF};
+                            (encoder_velocity % 4096) & 0xFF, 
+                            (encoder_velocity % 4096 >> 8) & 0xFF,
+                            (encoder_velocity % 4096 >> 16) & 0xFF};
         CAN_Transmit_Array(array, 4);
     }
 
@@ -489,8 +489,8 @@ void handle_telemetry_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
 
     if(msg_type == TELEM_MOTOR_TORQUE){
         uint8_t array[] = {TELEM_MOTOR_TORQUE, 
-                            (current_Q_setpoint_mA) & 0xFF, 
-                            (current_Q_setpoint_mA >> 8) & 0xFF};
+                            (current_Q_mA) & 0xFF, 
+                            (current_Q_mA >> 8) & 0xFF};
         CAN_Transmit_Array(array, 3);
     }
 

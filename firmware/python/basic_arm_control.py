@@ -12,6 +12,7 @@ print("Bus running")
 
 shoulder = FxFDrive(bus, 10)
 elbow = FxFDrive(bus, 11)
+wrist = FxFDrive(bus, 13)
 time.sleep(0.1)
 
 startup_write = True
@@ -36,6 +37,7 @@ time.sleep(0.1)
 print("Setting parameters")
 shoulder.set_parameter_int(shoulder.parameters.PARAM_CURRENT_LIMIT, 10000, 2)
 elbow.set_parameter_int(elbow.parameters.PARAM_CURRENT_LIMIT, 10000, 2)
+wrist.set_parameter_int(wrist.parameters.PARAM_CURRENT_LIMIT, 9000, 2)
 
 shoulder.set_parameter_int(shoulder.parameters.PARAM_ANTI_COGGING, 1, 1)
 elbow.set_parameter_int(elbow.parameters.PARAM_ANTI_COGGING, 1, 1)
@@ -43,10 +45,20 @@ elbow.set_parameter_int(elbow.parameters.PARAM_ANTI_COGGING, 1, 1)
 input("Idle drivers?")
 shoulder.action.request_state_change(DriveState.drive_state_idle.value)
 elbow.action.request_state_change(DriveState.drive_state_idle.value)
+wrist.action.request_state_change(DriveState.drive_state_idle.value)
+
+# while(True):
+#     if(input() == "x"):
+#         break
+#     print(shoulder.telemetry.get_motor_position_encoder_raw(),
+#           elbow.telemetry.get_motor_position_encoder_raw(),
+#           wrist.telemetry.get_motor_position_encoder_raw())
+
 
 input("Enable position?")
 shoulder.action.request_state_change(DriveState.drive_state_position_control.value)
 elbow.action.request_state_change(DriveState.drive_state_position_control.value)
+wrist.action.request_state_change(DriveState.drive_state_position_control.value)
 
 def lerp(a, b, factor):
     return a * (1 - factor) + b * factor
@@ -70,34 +82,15 @@ def trapazoidal_target(start, end, max_vel, max_acc, t):
         return start + sign * (0.5 * t_a**2 * max_acc + max_vel * t_c + 0.5 * (t_a**2 * max_acc - (t_c + 2 * t_a - t)**2 * max_acc))
     else:
         return end
-# def trapazoidal_target_time(distance, max_vel, max_acc):
-#     t_a = max_vel / max_acc
-#     t_c = (distance - t_a * max_vel) / max_vel
-
-#     return 2*t_a + t_c
-
-
-
-# TRAP on each axis
-# timestep = 0.002
-# for t in range(2000):
-#     shoulder_target = int(trapazoidal_target(shoulder_starting_position, shoulder_target_position, 10_000, 20_000, t * timestep))
-#     shoulder.action.send_position_target(shoulder_target)
-
-#     elbow_target = int(trapazoidal_target(elbow_starting_position, elbow_target_position, 10_000, 20_000, t * timestep))
-#     elbow.action.send_position_target(elbow_target)
-#     time.sleep(0.001)
-    
-
-
 
 shoulder_starting_position = shoulder.telemetry.get_motor_position_encoder_raw()
 elbow_starting_position = elbow.telemetry.get_motor_position_encoder_raw()
+wrist_starting_position = wrist.telemetry.get_motor_position_encoder_raw()
 
-
-def trap_to_position(shoulder_target_position, elbow_target_position, samples):
+def trap_to_position(shoulder_target_position, elbow_target_position, wrist_target_position, samples):
     global shoulder_starting_position
     global elbow_starting_position
+    global wrist_starting_position
 
     elbow_position = []
     # shoulder_starting_position = shoulder.telemetry.get_motor_position_encoder_raw()
@@ -105,15 +98,17 @@ def trap_to_position(shoulder_target_position, elbow_target_position, samples):
 
     timestep = 0.001
     for t in range(samples):
-        factor = trapazoidal_target(0, 1, 8.0, 60.0, t * timestep)
+        factor = trapazoidal_target(0, 1, 3.0, 20.0, t * timestep)
         elbow_target = lerp(elbow_starting_position, elbow_target_position, factor)
         shoulder.action.send_position_target(lerp(shoulder_starting_position, shoulder_target_position, factor))
         elbow.action.send_position_target(elbow_target)
+        wrist.action.send_position_target(lerp(wrist_starting_position, wrist_target_position, factor))
         time.sleep(0.001)
-        elbow_position.append([elbow.telemetry.get_motor_position_encoder_raw(), elbow_target])
+        # elbow_position.append([elbow.telemetry.get_motor_position_encoder_raw(), elbow_target])
 
     shoulder_starting_position = shoulder_target_position
     elbow_starting_position = elbow_target_position
+    wrist_starting_position = wrist_target_position
 
     # plt.plot(elbow_position)
     # plt.show()
@@ -124,29 +119,14 @@ def trap_to_position(shoulder_target_position, elbow_target_position, samples):
 
 # time.sleep(5)
 input("Move")
-time.sleep(5)
-# trap_to_position(-9911, -11669, 800)
-trap_to_position(-9800, 7800, 800)
-# input("Move")
-trap_to_position(-1600, -1500, 800)
-# input("Move")
-trap_to_position(-9800, 7800, 800)
-
-
-
-
-# steps = 500
-# for i in range(steps):
-#     factor = i / steps
-#     shoulder.action.send_position_target(lerp(shoulder_starting_position, shoulder_target_position, factor))
-#     elbow.action.send_position_target(lerp(elbow_starting_position, elbow_target_position, factor))
-#     time.sleep(0.002)
-
-
-# shoulder -1769
-# elbow 4858
+trap_to_position(-2121, 6460, -138, 1000)
+trap_to_position(246, 6017, 611, 1000)
+trap_to_position(1000, 5577, 952, 1000)
+trap_to_position(246, 6017, 611, 1000)
+trap_to_position(-2121, 6460, -138, 1000)
 
 
 input("Disable drivers?")
 shoulder.action.request_state_change(DriveState.drive_state_disabled.value)
 elbow.action.request_state_change(DriveState.drive_state_disabled.value)
+wrist.action.request_state_change(DriveState.drive_state_disabled.value)

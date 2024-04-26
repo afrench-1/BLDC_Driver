@@ -49,6 +49,7 @@ extern int max_motor_current_mAmps;
 extern int estimated_resistance_mOhms;
 
 extern uint8_t electrical_angle_offset;
+extern int8_t electrical_mechanical_ratio;
 
 extern int current_Q_setpoint_mA;
 
@@ -100,6 +101,9 @@ void disable_foc_loop();
  */
 void estimate_phase_resistance(float voltage);
 void calibrate_encoder(float voltage);
+
+
+uint8_t convert_to_electrical_angle(int mechanical_angle, int ratio, int offset);
 
 enum DriveError check_supply_voltage();
 

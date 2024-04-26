@@ -18,6 +18,7 @@ extern int16_t current_C_mA_filtered;
 extern int current_Q_setpoint_mA;
 extern int current_setpoint_limit_mA;
 extern int encoder_velocity;
+extern int hysteresis_offset;
 
 extern position_control_enabled;
 

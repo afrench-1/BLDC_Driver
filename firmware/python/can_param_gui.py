@@ -93,10 +93,10 @@ class GUI(object):
                             self.drive = drive
                             self.drive.read_parameters()
 
-                            if(self.drive.can_id == 10):
-                                self.drive.set_parameter_int(self.drive.parameters.PARAM_ENCODER_OFFSET, -98, 1)
-                            if(self.drive.can_id == 11):
-                                self.drive.set_parameter_int(self.drive.parameters.PARAM_ENCODER_OFFSET, 49, 1)
+                            # if(self.drive.can_id == 10):
+                            #     self.drive.set_parameter_int(self.drive.parameters.PARAM_ENCODER_OFFSET, -98, 1)
+                            # if(self.drive.can_id == 11):
+                            #     self.drive.set_parameter_int(self.drive.parameters.PARAM_ENCODER_OFFSET, 49, 1)
 
                             self.color = [self.drive.parameters.run_led_colors[0] / 255.0,
                                 self.drive.parameters.run_led_colors[1] / 255.0,

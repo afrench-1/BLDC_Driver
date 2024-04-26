@@ -47,6 +47,10 @@ int16_t voltage_a_mV = 0;
 int16_t voltage_b_mV = 0;
 int16_t voltage_c_mV = 0;
 
+int direction = 1;
+int hysteresis_offset_value = 4;
+int hysteresis_offset = 3;
+
 // Gains
 // TODO: Choose this based on motor resistance and inductance
 float current_P_gain = 0.04f;
@@ -55,7 +59,8 @@ float current_P_gain = 0.04f;
 int prev_encoder_position = 0;
 int encoder_velocity = 0;
 uint8_t electrical_angle = 0;
-uint8_t electrical_angle_offset = 48;
+uint8_t electrical_angle_offset = 0;
+int8_t electrical_mechanical_ratio = 21;
 
 int position_setpoint = 0;
 
@@ -68,12 +73,25 @@ void foc_interrupt(){
     // Calculate electrical angle as a uint8
     // 0 is aligned with phase A
     // 255 is just before wraparound
-    electrical_angle = enc_angle_int % (4096 / 8) / 2 + electrical_angle_offset;
 
+    // Hardcoded for now
+
+    if( (enc_angle_int - prev_encoder_position) > 0 && direction < 0 ){
+        hysteresis_offset = -hysteresis_offset_value;
+        direction = 1;
+    } else if( (enc_angle_int - prev_encoder_position) < 0 && direction > 0 ){
+        hysteresis_offset = hysteresis_offset_value;
+        direction = -1;
+    } else {
+        // hysteresis_offset = 0;
+    }
+    electrical_angle = convert_to_electrical_angle(enc_angle_int + hysteresis_offset, 21, 25);
+
+    // electrical_angle = convert_to_electrical_angle(enc_angle_int, 21, 128);
 
     // Calculate velocity
     // TODO: This is bad
-    encoder_velocity = encoder_velocity * 0.998 + ((enc_angle_int - prev_encoder_position) * 10000) * 0.002;
+    encoder_velocity = encoder_velocity * 0.995f + ((enc_angle_int - prev_encoder_position) * 10000) * 0.005f;
     prev_encoder_position = enc_angle_int;
 
     // Calculate motor voltage
@@ -87,13 +105,13 @@ void foc_interrupt(){
     current_B_mA =  - (current_A_mA + current_C_mA);
 
     // Perform an IIR filter on current to cut down on noise and injected vibrations
-    current_A_mA_filtered = current_A_mA;
-    current_B_mA_filtered = current_B_mA;
-    current_C_mA_filtered = current_C_mA;
+    // current_A_mA_filtered = current_A_mA;
+    // current_B_mA_filtered = current_B_mA;
+    // current_C_mA_filtered = current_C_mA;
 
-    // current_A_mA_filtered = current_A_mA_filtered * 0.05f + current_A_mA * 0.95f;
-    // current_B_mA_filtered = current_B_mA_filtered * 0.05f + current_B_mA * 0.95f;
-    // current_C_mA_filtered = current_C_mA_filtered * 0.05f + current_C_mA * 0.95f;
+    current_A_mA_filtered = current_A_mA_filtered * 0.05f + current_A_mA * 0.95f;
+    current_B_mA_filtered = current_B_mA_filtered * 0.05f + current_B_mA * 0.95f;
+    current_C_mA_filtered = current_C_mA_filtered * 0.05f + current_C_mA * 0.95f;
 
     // Perform clarke and park transform to get motor current in orthogonal rotor-centric coordinates
     clarke_transform(current_A_mA_filtered, current_B_mA_filtered, current_C_mA_filtered, &current_Alpha_mA, &current_Beta_mA);
@@ -106,14 +124,19 @@ void foc_interrupt(){
         // position_setpoint_filtered = 0.99f * position_setpoint_filtered + position_setpoint * 0.01f;
         // position_setpoint_filtered = position_setpoint;
         // current_Q_setpoint_mA = 0.0f * current_Q_setpoint_mA + ((enc_angle_int - position_setpoint_filtered) * 100.0f) * 1.0f;
-        // int vel_setpoint = 1000;
-        int vel_setpoint = 10.0f * (position_setpoint - enc_angle_int);
-        current_Q_setpoint_mA = 1.5f * (encoder_velocity-vel_setpoint) - 0.0f * vel_setpoint;
+        // int vel_setpoint = 500;
+
+        // OLD 10 vel, 1.5 position
+        // int vel_setpoint = 10.0f * (position_setpoint - enc_angle_int - hysteresis_offset);
+        // current_Q_setpoint_mA = -20.0f * (encoder_velocity-vel_setpoint) - 0.0f * vel_setpoint;
+        current_Q_setpoint_mA = 200.0f * (position_setpoint - (enc_angle_int + hysteresis_offset));
+        // current_Q_setpoint_mA = 5000; 
+
     } else {
         current_Q_setpoint_mA = 0;
     }
 
-    // current_setpoint_limit_mA = 3000; // 1A current setpoint for testing
+     // 1A current setpoint for testing
 
     // torque_setpoint = (position_setpoint - enc_angle_int) * 1.0f;
     // current_Q_setpoint_mA = bound( (int16_t) (position_setpoint - enc_angle_int) * 1.0f, -current_setpoint_limit_mA, current_setpoint_limit_mA);
@@ -126,16 +149,17 @@ void foc_interrupt(){
         current_Q_setpoint_mA += current_offsets[electrical_angle] * 1.0f;
     }
 
+    float current_gain = 0.005f;
     // Q current P loop
     // TODO: Add an integral term?
-    voltage_Q_mV = (current_Q_mA - current_Q_setpoint_mA) * 0.04f;
-    // voltage_Q_mV = -current_Q_setpoint_mA * 0.01f;
-    // voltage_Q_mV = 0;
-    voltage_Q_mV = (int16_t) bound(voltage_Q_mV, -200, 200);
+    voltage_Q_mV = (current_Q_mA - current_Q_setpoint_mA) * current_gain - current_Q_setpoint_mA * 0.001f ;
+    // voltage_Q_mV = -current_Q_setpoint_mA * 0.001f;
+    // voltage_Q_mV = 20;
+    voltage_Q_mV = (int16_t) bound(voltage_Q_mV, -250, 250);
     // D current P loop
-    voltage_D_mV = -(current_D_mA - current_D_setpoint_mA)  * 0.04f;
-    // voltage_D_mV = 0;
-    voltage_D_mV = (int16_t) bound(voltage_D_mV, -200, 200);
+    // voltage_D_mV = -(current_D_mA - current_D_setpoint_mA) * current_gain;
+    voltage_D_mV = 0;
+    voltage_D_mV = (int16_t) bound(voltage_D_mV, -250, 250);
 
     // Perform inverse park and clarke transform to convert from rotor-centric voltage into phase voltages
     inverse_park_transform(voltage_D_mV, voltage_Q_mV, electrical_angle, &voltage_Alpha_mV, &voltage_Beta_mV);

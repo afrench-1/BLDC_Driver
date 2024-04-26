@@ -45,20 +45,20 @@ void set_encoder_absolute_offset(){
   // Disable magnetic encoder
   start_up_pulses = true;
   HAL_GPIO_WritePin(ENC_EN_GPIO_Port, ENC_EN_Pin, 1);
-  app_delay_ms(10);
+  app_delay_ms(20);
 
   // Reset angle
   enc_angle_int = 0;
   // Enable magnetic encoder
   HAL_GPIO_WritePin(ENC_EN_GPIO_Port, ENC_EN_Pin, 0);
-  // app_delay_ms(10);
-  HAL_Delay(10);
+  app_delay_ms(10);
+  // HAL_Delay(10);
   start_up_pulse_count = enc_angle_int;
 
   // FIND DIRECTION
   start_up_pulses = false;
   HAL_GPIO_WritePin(ENC_EN_GPIO_Port, ENC_EN_Pin, 1);
-  app_delay_ms(10);
+  app_delay_ms(15);
   // Reset angle
   enc_angle_int = 0;
   // Enable magnetic encoder
