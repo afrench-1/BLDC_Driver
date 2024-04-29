@@ -86,7 +86,7 @@ void foc_interrupt(){
     } else {
         // hysteresis_offset = 0;
     }
-    electrical_angle = convert_to_electrical_angle(enc_angle_int + hysteresis_offset, 21, 25);
+    electrical_angle = convert_to_electrical_angle(enc_angle_int + hysteresis_offset, electrical_mechanical_ratio, electrical_angle_offset);
 
     // electrical_angle = convert_to_electrical_angle(enc_angle_int, 21, 128);
 
@@ -132,7 +132,8 @@ void foc_interrupt(){
         // int vel_setpoint = 10.0f * (position_setpoint - enc_angle_int - hysteresis_offset);
         // current_Q_setpoint_mA = -20.0f * (encoder_velocity-vel_setpoint) - 0.0f * vel_setpoint;
         // current_Q_setpoint_mA = -3.0f * encoder_velocity;
-        current_Q_setpoint_mA = 400.0f * (position_setpoint - (enc_angle_int + hysteresis_offset)) - 15.0f * encoder_velocity;
+        // current_Q_setpoint_mA = 300.0f * (position_setpoint_filtered - (enc_angle_int + hysteresis_offset)) - 15.0f * encoder_velocity;
+        current_Q_setpoint_mA = - 15.0f * (encoder_velocity - position_setpoint);
         // current_Q_setpoint_mA = 5000; 
 
     } else {

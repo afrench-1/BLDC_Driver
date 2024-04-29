@@ -206,6 +206,7 @@ void calibrate_encoder(float voltage){
     float input_voltage = get_vmotor();
     float desired_voltage = voltage;
     int duty = (int)((desired_voltage / input_voltage) * 256);
+    duty = 10;
 
     volatile int offset_average = 0;
 
@@ -235,51 +236,39 @@ void calibrate_encoder(float voltage){
     for(int i = 0; i<=256 * 2; i++){
         uint8_t applied_electrical_angle = (uint8_t) (int) (i) % 256;
         apply_duty_at_electrical_angle_int(applied_electrical_angle, duty);
+        osDelay(5);
 
         volatile uint8_t measured_electrical_angle = convert_to_electrical_angle(enc_angle_int, electrical_mechanical_ratio, 0);
         
-        int offset = applied_electrical_angle - measured_electrical_angle;
-        
-        if(offset < 127){
-            offset += 255;
-        }
-
-        if(offset > 127){
-            offset -= 255;
+        int offset = measured_electrical_angle - applied_electrical_angle;
+        if(offset < 0){
+            offset = 256 + offset;
         }
 
         offset_average += offset;
-        
-        osDelay(5);
     }
 
     // Spin backward
     for(int i = 0; i<=256 * 2; i++){
         uint8_t applied_electrical_angle = (uint8_t) (int) (-i) % 256;
         apply_duty_at_electrical_angle_int(applied_electrical_angle, duty);
+        osDelay(5);
 
         volatile uint8_t measured_electrical_angle = convert_to_electrical_angle(enc_angle_int, electrical_mechanical_ratio, 0);
         
-        int offset = applied_electrical_angle - measured_electrical_angle;
-        
-        if(offset < 127){
-            offset += 255;
-        }
-
-        if(offset > 127){
-            offset -= 255;
+        int offset = measured_electrical_angle - applied_electrical_angle;
+        if(offset < 0){
+            offset = 256 + offset;
         }
 
         offset_average += offset;
-        
-        osDelay(5);
     }
 
     set_duty_phases(0,0,0);
     
 
 
-    electrical_angle_offset = offset_average / (256 * 4) + 128;
+    electrical_angle_offset = offset_average / (256 * 4);
     printf("lmao");
 }
 
