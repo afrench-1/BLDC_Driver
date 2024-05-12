@@ -469,9 +469,9 @@ void handle_telemetry_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
 
     if(msg_type == TELEM_MOTOR_VELOCITY){
         uint8_t array[] = {TELEM_MOTOR_VELOCITY, 
-                            (encoder_velocity % 4096) & 0xFF, 
-                            (encoder_velocity % 4096 >> 8) & 0xFF,
-                            (encoder_velocity % 4096 >> 16) & 0xFF};
+                            ((int) round(v_hat)) & 0xFF, 
+                            ((int) round(v_hat) >> 8) & 0xFF,
+                            ((int) round(v_hat) >> 16) & 0xFF};
         CAN_Transmit_Array(array, 4);
     }
 

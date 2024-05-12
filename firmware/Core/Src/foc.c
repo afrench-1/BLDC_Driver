@@ -70,12 +70,21 @@ void set_current_setpoints(int D_setpoint_mA, int Q_setpoint_mA){
     current_D_setpoint_mA = D_setpoint_mA;
 }
 
+
+float q_hat = 0;
+float q_err = 0;
+float v_hat = 0;
+const float loop_rate = 10000.0f; 
+volatile const float dt = 1.0/loop_rate;
+
+int adjusted_enc_angle = 0;
+
+bool first_run = true;
+
 void foc_interrupt(){
     // Calculate electrical angle as a uint8
     // 0 is aligned with phase A
     // 255 is just before wraparound
-
-    // Hardcoded for now
 
     if( (enc_angle_int - prev_encoder_position) > 0 && direction < 0 ){
         hysteresis_offset = -hysteresis_offset_value;
@@ -86,15 +95,30 @@ void foc_interrupt(){
     } else {
         // hysteresis_offset = 0;
     }
-    electrical_angle = convert_to_electrical_angle(enc_angle_int + hysteresis_offset, electrical_mechanical_ratio, electrical_angle_offset);
 
-    // electrical_angle = convert_to_electrical_angle(enc_angle_int, 21, 128);
+    adjusted_enc_angle = enc_angle_int + hysteresis_offset;
+    electrical_angle = convert_to_electrical_angle(adjusted_enc_angle, electrical_mechanical_ratio, electrical_angle_offset);
 
     // Calculate velocity
-    // TODO: This is bad
-    encoder_velocity = encoder_velocity * 0.99f + (((enc_angle_int + hysteresis_offset) - (prev_encoder_position + prev_hysteresis_offset)) * 10000) * 0.01f;
-    prev_encoder_position = enc_angle_int;
-    prev_hysteresis_offset = hysteresis_offset;
+
+    // "warm up" observer
+    if(first_run == true){
+        q_hat = (float) adjusted_enc_angle;
+        prev_encoder_position = adjusted_enc_angle;
+        first_run = false;
+    }
+
+    // Estimate new position
+    q_hat += dt * v_hat;
+
+    // If encoder has changed, update observer
+    // if(prev_encoder_position != adjusted_enc_angle){
+    q_err = adjusted_enc_angle - q_hat;
+    v_hat += 10.0f * q_err - 0.1 * v_hat;
+    // }
+
+    encoder_velocity = round(v_hat);
+    prev_encoder_position = adjusted_enc_angle;
 
     // Calculate motor voltage
     voltage_supply_mV = adc1_dma[0] * 13;
@@ -133,7 +157,7 @@ void foc_interrupt(){
         // current_Q_setpoint_mA = -20.0f * (encoder_velocity-vel_setpoint) - 0.0f * vel_setpoint;
         // current_Q_setpoint_mA = -3.0f * encoder_velocity;
         // current_Q_setpoint_mA = 300.0f * (position_setpoint_filtered - (enc_angle_int + hysteresis_offset)) - 15.0f * encoder_velocity;
-        current_Q_setpoint_mA = - 15.0f * (encoder_velocity - position_setpoint);
+        current_Q_setpoint_mA = - 10.0f * (encoder_velocity - 1000);
         // current_Q_setpoint_mA = 5000; 
 
     } else {
@@ -153,10 +177,10 @@ void foc_interrupt(){
         current_Q_setpoint_mA += current_offsets[electrical_angle] * 1.0f;
     }
 
-    float current_gain = 0.005f;
+    float current_gain = 0.002f;
     // Q current P loop
     // TODO: Add an integral term?
-    voltage_Q_mV = (current_Q_mA - current_Q_setpoint_mA) * current_gain - current_Q_setpoint_mA * 0.0015f ;
+    voltage_Q_mV = (current_Q_mA - current_Q_setpoint_mA) * current_gain - current_Q_setpoint_mA * 0.002f ;
     // voltage_Q_mV = -current_Q_setpoint_mA * 0.001f;
     // voltage_Q_mV = 20;
     voltage_Q_mV = (int16_t) bound(voltage_Q_mV, -250, 250);

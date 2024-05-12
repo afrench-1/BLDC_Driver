@@ -80,6 +80,10 @@ void Error_Handler(void);
 #define IFA_EXTI_IRQn EXTI1_IRQn
 #define IFB_Pin GPIO_PIN_2
 #define IFB_GPIO_Port GPIOB
+#define THERM_FET_Pin GPIO_PIN_11
+#define THERM_FET_GPIO_Port GPIOB
+#define THERM_MOT_Pin GPIO_PIN_12
+#define THERM_MOT_GPIO_Port GPIOB
 #define DRV_NFAULT_Pin GPIO_PIN_13
 #define DRV_NFAULT_GPIO_Port GPIOB
 #define DRV_EN_Pin GPIO_PIN_14

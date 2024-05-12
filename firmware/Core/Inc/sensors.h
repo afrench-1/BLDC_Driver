@@ -12,7 +12,7 @@
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
 
-extern uint16_t adc1_dma[2];
+extern int16_t adc1_dma[4]; // V sense, temp mot, temp fet, temp stm
 extern uint16_t adc2_dma[3];
 
 extern uint16_t phase_resistance_mOhm[3];

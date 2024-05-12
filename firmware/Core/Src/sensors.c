@@ -1,7 +1,7 @@
 #include "sensors.h"
 #include "app_timers.h"
 
-uint16_t adc1_dma[2];
+int16_t adc1_dma[4];
 uint16_t adc2_dma[3];
 uint32_t adc2_calib_offset[3];
 
@@ -86,7 +86,7 @@ void start_ADC(){
 
   // Calibrate and start adc1 DMA (vmot + temp)
   calibrate_ADC(&hadc1);
-  HAL_ADC_Start_DMA(&hadc1, adc1_dma, 2);
+  HAL_ADC_Start_DMA(&hadc1, adc1_dma, 4);
 
   // Calibrate and start adc2 DMA (phase current shunts)
   calibrate_ADC(&hadc2);

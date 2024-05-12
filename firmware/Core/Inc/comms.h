@@ -22,6 +22,9 @@ extern int hysteresis_offset;
 
 extern position_control_enabled;
 
+extern float q_hat;
+extern float v_hat;
+
 extern uint8_t run_LED_colors[];
 
 enum canBitrate {
