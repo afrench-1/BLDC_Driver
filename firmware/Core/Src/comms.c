@@ -1,6 +1,6 @@
 #include "comms.h"
 #include "stdlib.h"
-#include "string.h"
+#include "string.h" 
 #include "stdio.h"
 #include "usbd_cdc_if.h"
 
@@ -386,7 +386,7 @@ void handle_action_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
         if(setpoint > 16777216/2){
             setpoint = setpoint - 16777216;
         }
-
+ 
         position_setpoint = setpoint;
     }
 
