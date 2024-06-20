@@ -66,3 +66,29 @@ void mem_read (uint16_t page, uint16_t offset, uint8_t *data, uint16_t size)
 		pos += bytesremaining;
 	}
 }
+
+void mem_write_uint8(uint8_t number, uint16_t page, uint16_t offset){
+    uint8_t data_to_write[1] = {electrical_angle_offset};
+    eeprom_write(page, offset, data_to_write, 1);
+}
+
+uint8_t mem_read_uint8(uint16_t page, uint16_t offset){
+    uint8_t data_to_read[1];
+    eeprom_read(page, offset, data_to_read, 1);
+
+    return data_to_read[0];
+}
+
+void write_encoder_params(){
+    uint8_t data_to_write[1] = {electrical_angle_offset};
+
+    mem_write_uint8(electrical_angle_offset,
+                    PARAM_ENCODER_OFFSET_PAGE,
+                    PARAM_ENCODER_OFFSET_BYTE);
+}
+
+void read_encoder_params() {
+    electrical_angle_offset = mem_read_uint8(
+                    PARAM_ENCODER_OFFSET_PAGE,
+                    PARAM_ENCODER_OFFSET_BYTE);
+}
