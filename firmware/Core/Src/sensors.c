@@ -157,3 +157,43 @@ void update_current_sense(){
   // current_sense[1] = (current_sense[1]) * (1.0f - filter_constant) + adc2_dma[1] * filter_constant;
   // current_sense[2] = (current_sense[2]) * (1.0f - filter_constant) + adc2_dma[2] * filter_constant;
 }
+
+#define BETA_FET 4050.0f
+// TODO: Allow for manual calibration of this, this is an approximation
+#define BETA_MOT 4000.0f 
+#define ROOM_TEMP 298.15f
+#define ADC_MAX 4096.0f
+#define R_1 10.0f
+#define FET_R_ROOM_TEMP 47.0f
+#define MOT_R_ROOM_TEMP 10.0f
+#define KELVIN_TO_C 273.15f
+
+// TODO: Allow for manual calibration of this
+#define ADC_ADJUSTMENT_FACTOR_FET 150
+#define ADC_ADJUSTMENT_FACTOR_MOT 100
+
+float get_fet_temp(){
+  // Calculate ntc resistance given the other parameters in the voltage divider
+  float r_ntc = R_1 / ((ADC_MAX / ((float) adc1_dma[3] + ADC_ADJUSTMENT_FACTOR_FET)) - 1);
+  
+  float fet_temp_kelvin = (BETA_FET * ROOM_TEMP) /
+                          (BETA_FET + (ROOM_TEMP * logf(r_ntc / FET_R_ROOM_TEMP)));
+
+  // Convert from kelvin to C
+  volatile float fet_temp_C = fet_temp_kelvin - KELVIN_TO_C;
+  
+  return fet_temp_C;
+}
+
+float get_mot_temp(){
+  // Calculate ntc resistance given the other parameters in the voltage divider
+  float r_ntc = R_1 / ((ADC_MAX / ((float) adc1_dma[2] + ADC_ADJUSTMENT_FACTOR_MOT)) - 1);
+  
+  float mot_temp_kelvin = (BETA_MOT * ROOM_TEMP) /
+                          (BETA_MOT + (ROOM_TEMP * logf(r_ntc / MOT_R_ROOM_TEMP)));
+
+  // Convert from kelvin to c
+  volatile float mot_temp_C = mot_temp_kelvin - KELVIN_TO_C;
+  
+  return mot_temp_C;
+}    

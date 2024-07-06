@@ -3,6 +3,7 @@
 
 #include "main.h"
 #include "stdbool.h"
+#include "math.h"
 
 #define AMP_GAIN 40.0f
 #define SHUNT_VALUE_R 0.002f
@@ -72,5 +73,7 @@ void update_current_sense();
 float get_vmotor();
 
 bool get_dip(int dip_num);
+
+float get_fet_temp();
 
 #endif

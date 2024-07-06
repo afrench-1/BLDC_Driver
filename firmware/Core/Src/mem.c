@@ -69,15 +69,44 @@ void mem_read (uint16_t page, uint16_t offset, uint8_t *data, uint16_t size)
 
 void mem_write_uint8(uint8_t number, uint16_t page, uint16_t offset){
     uint8_t data_to_write[1] = {electrical_angle_offset};
-    eeprom_write(page, offset, data_to_write, 1);
+    mem_write(page, offset, data_to_write, 1);
 }
 
 uint8_t mem_read_uint8(uint16_t page, uint16_t offset){
     uint8_t data_to_read[1];
-    eeprom_read(page, offset, data_to_read, 1);
+    mem_read(page, offset, data_to_read, 1);
 
     return data_to_read[0];
 }
+
+void mem_write_uint16(uint16_t number, uint16_t page, uint16_t offset){
+    uint8_t data_to_write[2] = {number & 0xFF, number >> 8 & 0xFF};
+    mem_write(page, offset, data_to_write, 2);
+}
+
+uint16_t mem_read_uint16(uint16_t page, uint16_t offset){
+    uint8_t data_to_read[2];
+    mem_read(page, offset, data_to_read, 2);
+
+    return data_to_read[0] | data_to_read[1] << 8;
+}
+
+void mem_write_uint32(uint32_t number, uint16_t page, uint16_t offset){
+    uint8_t data_to_write[4] = {number & 0xFF, 
+                                number >> 8 & 0xFF,
+                                number >> 16 & 0xFF,
+                                number >> 24 & 0xFF};
+    mem_write(page, offset, data_to_write, 4);
+}
+
+uint32_t mem_read_uint32(uint16_t page, uint16_t offset){
+    uint8_t data_to_read[4];
+    mem_read(page, offset, data_to_read, 4);
+
+    return data_to_read[0] | data_to_read[1] << 8
+            | data_to_read[2] << 16| data_to_read[3] << 24;
+}
+
 
 void write_encoder_params(){
     uint8_t data_to_write[1] = {electrical_angle_offset};

@@ -26,6 +26,7 @@
 #include "app.h"
 #include "foc.h"
 #include "sensors.h"
+#include "mem.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -109,6 +110,7 @@ void StartMainStateLoop(void *argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
 
@@ -155,15 +157,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
   app_setup();
 
-  // uint8_t dataWrite[8] = {1,2,3,4,5,6,7,8};
-  uint8_t dataRead[8];
-
-  // EEPROM_Write(3, 10, dataWrite, 8);
-  // // EEPROM_Read(3, 10, dataRead, 8);
-  // HAL_GPIO_WritePin(DRV_EN_GPIO_Port, DRV_EN_Pin, 1);
-  // HAL_Delay(100);
-  // HAL_GPIO_WritePin(DRV_EN_GPIO_Port, DRV_EN_Pin, 0);
-  // set_duty_phases(2, 2, 2);
+  mem_write_uint32(500000, 1, 0);
+  volatile uint32_t test = mem_read_uint32(1, 0);
+  
 
   /* USER CODE END 2 */
 
@@ -1001,9 +997,8 @@ void StartStatusBlink(void *argument)
   for(;;)
   {
     app_status_led_task();
-    volatile float temp1 = ((float) adc1_dma[2]) / 4096.0f;
-    volatile float temp2 = ((float) adc1_dma[3]) / 4096.0f;
-    printf("lol");
+    get_fet_temp();
+    get_mot_temp();
   }
   /* USER CODE END StartStatusBlink */
 }

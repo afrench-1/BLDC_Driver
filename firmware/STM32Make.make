@@ -41,10 +41,10 @@ Core/Src/app_freertos.c \
 Core/Src/app_timers.c \
 Core/Src/comms.c \
 Core/Src/drive.c \
-Core/Src/eeprom.c \
 Core/Src/foc.c \
 Core/Src/led.c \
 Core/Src/main.c \
+Core/Src/mem.c \
 Core/Src/sensors.c \
 Core/Src/stm32_uidhash.c \
 Core/Src/stm32g4xx_hal_msp.c \
