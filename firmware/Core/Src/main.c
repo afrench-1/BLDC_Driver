@@ -157,8 +157,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
   app_setup();
 
-  mem_write_uint32(500000, 1, 0);
-  volatile uint32_t test = mem_read_uint32(1, 0);
+  // mem_write_uint32(500000, 1, 0);
+  // volatile uint32_t test = mem_read_uint32(1, 0);
   
 
   /* USER CODE END 2 */

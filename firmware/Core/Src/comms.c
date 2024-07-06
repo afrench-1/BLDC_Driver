@@ -390,60 +390,14 @@ void handle_action_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
         position_setpoint = setpoint;
     }
 
+
+    // State transitions
     if(msg_type == ACTION_REQUEST_STATE_CHANGE){
         enum DriveState new_state = RxData[1];
 
-
-        // Error -> Disabled
-        // Also clears error
-        if(new_state == drive_state_disabled && drive_state == drive_state_error){
-            drive_state = drive_state_disabled;
-            drive_error = drive_error_none;
-        }
-
-        // Disabled -> Encoder calibration
-        if(new_state == drive_state_encoder_calibration && drive_state == drive_state_disabled){
-            drive_state = drive_state_encoder_calibration;
-        }
-
-        // Disabled -> Resistance estimation
-        if(new_state == drive_state_resistance_estimation && drive_state == drive_state_disabled){
-            drive_state = drive_state_resistance_estimation;
-        }
-
-        // Disabled -> Anti cogging calibration
-        if(new_state == drive_state_anti_cogging_calibration && drive_state == drive_state_disabled){
-            drive_state = drive_state_anti_cogging_calibration;
-        }
-
-        // Disabled -> Idle
-        if(new_state == drive_state_idle && drive_state == drive_state_disabled){
-            // TODO: Check that encoder has been calibrated
-            drive_state = drive_state_idle;
-        }
-
-        // Idle -> Disabled
-        if(new_state == drive_state_disabled && drive_state == drive_state_idle){
-            // TODO: Check that encoder has been calibrated
-            drive_state = drive_state_disabled;
-        }
-
-        // Position -> idle
-        if(new_state == drive_state_position_control && drive_state == drive_state_idle){
-            position_setpoint = enc_angle_int;
-            drive_state = drive_state_position_control;
-        }
-
-        // Position -> disabled
-        if(new_state == drive_state_disabled && drive_state == drive_state_position_control){
-            drive_state = drive_state_disabled;
-        }
-
-        // Position -> idle
-        if(new_state == drive_state_idle && drive_state == drive_state_position_control){
-            drive_state = drive_state_idle;
-        }
-        
+        // Request state change and transmit result
+        bool result = request_drive_state_change(new_state);
+        CAN_Transmit_Bool(result);
     }
 }
 

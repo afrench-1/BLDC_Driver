@@ -196,4 +196,4 @@ float get_mot_temp(){
   volatile float mot_temp_C = mot_temp_kelvin - KELVIN_TO_C;
   
   return mot_temp_C;
-}    
+}

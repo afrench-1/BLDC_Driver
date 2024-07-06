@@ -10,11 +10,18 @@ Drive.c includes motor drive related functions,
 
 ## Functions
 
+### Control
+```{eval-rst}
+.. doxygenfunction:: enable_foc_loop
+.. doxygenfunction:: disable_foc_loop
+```
+
 ### Calibration and Diagnostic
 
 ```{eval-rst}
 .. doxygenfunction:: estimate_phase_resistance
 .. doxygenfunction:: check_supply_voltage
+.. doxygenfunction:: calibrate_encoder
 ```
 
 ### Gate drive

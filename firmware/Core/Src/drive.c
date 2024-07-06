@@ -1,7 +1,9 @@
 #include "drive.h"
 
+
+// Default drive states
 enum DriveError drive_error = drive_error_none;
-enum DriveState drive_state = drive_state_disabled;
+enum DriveState drive_state = drive_state_init;
 
 // If true, FOC is allowed to control motor phases
 bool foc_active = false;
@@ -39,10 +41,96 @@ void disable_foc_loop(){
     // HAL_GPIO_WritePin(INLX_GPIO_Port, INLX_Pin, 0);
 }
 
+// State transitions
+bool request_drive_state_change(enum DriveState new_state){
+    // Error -> Init
+    // Also clears error
+    if(new_state == drive_state_init && drive_state == drive_state_error){
+        drive_state = drive_state_init;
+        drive_error = drive_error_none;
+        return true;
+    }
+
+    // Disabled -> Encoder calibration
+    if(new_state == drive_state_encoder_calibration && drive_state == drive_state_disabled){
+        drive_state = drive_state_encoder_calibration;
+        return true;
+    }
+
+    // Disabled -> Resistance estimation
+    if(new_state == drive_state_resistance_estimation && drive_state == drive_state_disabled){
+        drive_state = drive_state_resistance_estimation;
+        return true;
+    }
+
+    // Disabled -> Anti cogging calibration
+    if(new_state == drive_state_anti_cogging_calibration && drive_state == drive_state_disabled){
+        drive_state = drive_state_anti_cogging_calibration;
+        return true;
+    }
+
+    // Disabled -> Idle
+    if(new_state == drive_state_idle && drive_state == drive_state_disabled){
+        // TODO: Check that encoder has been calibrated
+        drive_state = drive_state_idle;
+        return true;
+    }
+
+    // Idle -> Disabled
+    if(new_state == drive_state_disabled && drive_state == drive_state_idle){
+        // TODO: Check that encoder has been calibrated
+        drive_state = drive_state_disabled;
+        return true;
+    }
+
+    // Idle -> Position
+    if(new_state == drive_state_position_control && drive_state == drive_state_idle){
+        position_setpoint = enc_angle_int;
+        drive_state = drive_state_position_control;
+        return true;
+    }
+    // Position -> disabled
+    if(new_state == drive_state_disabled && drive_state == drive_state_position_control){
+        drive_state = drive_state_disabled;
+        return true;
+    }
+    // Position -> Idle
+    if(new_state == drive_state_idle && drive_state == drive_state_position_control){
+        drive_state = drive_state_idle;
+        return true;
+    }
+
+    // Else, return false
+    return false;
+}
 
 
+// Attempt to initialise DRV chip and perform basic checks
+void drive_init(){
+    // Check voltage (DRV chip doesn't run without motor supply voltage)
+    if(check_supply_voltage() != drive_error_none){
+        return;
+    }
+
+    // Enable DRV
+    enable_DRV();
+    calibrate_DRV_amps();
+
+    // Enable low side gates
+    // Set all phases to 0 before enabling
+    set_duty_phases(0, 0, 0);
+    HAL_GPIO_WritePin(INLX_GPIO_Port, INLX_Pin, 1);
+
+    // Start 10kHz motor commutation interrupt
+    // Make sure FOC loop is disabled
+    disable_foc_loop();
+    HAL_TIM_Base_Start_IT(&htim6);
+}
 
 
+// Enter drive error
+// This is a function since we want to do some other things automatically 
+// when a fault occurs (e.g. disabling foc control)
 void enter_drive_error(enum DriveError error){
     drive_error = error;
     drive_state = drive_state_error;
@@ -52,9 +140,24 @@ void enter_drive_error(enum DriveError error){
 void drive_state_machine(){
 
     switch(drive_state){
+
+        // "Off" modes
+        case drive_state_error:
+            break;
+
+        case drive_state_init:
+            drive_init();
+            if(drive_state != drive_state_error){
+                drive_state = drive_state_disabled;
+            }
+            break;
+
         case drive_state_disabled:
             disable_foc_loop();
             break;
+
+
+        // Calibration modes
         case drive_state_resistance_estimation:
             estimate_phase_resistance(5.0f);
             if(drive_state != drive_state_error){
@@ -76,17 +179,29 @@ void drive_state_machine(){
             }
             break;
 
+
+        // Control modes
         case drive_state_idle:
             enable_foc_loop();
             break;
 
+        case drive_state_torque_control:
+            enable_foc_loop();
+            break;
+
+        case drive_state_velocity_control:
+            enable_foc_loop();
+            break;
+        
         case drive_state_position_control:
             enable_foc_loop();
             break;
+
+
     }
 
 
-    // Check 
+    // Check voltage
     if(get_vmotor() < MIN_SUPPLY_VOLTAGE_V){
         enter_drive_error(drive_error_low_voltage);
     }
@@ -189,6 +304,7 @@ void estimate_phase_resistance(float voltage){
     }
 }
 
+// Convert from mechanical (encoder based) to electrical angle
 uint8_t convert_to_electrical_angle(int mechanical_angle, int ratio, int offset){
     volatile uint32_t temp = ((uint32_t)mechanical_angle % 4096);
     temp = temp % (4096 / ratio);
@@ -197,7 +313,8 @@ uint8_t convert_to_electrical_angle(int mechanical_angle, int ratio, int offset)
     return temp - offset;
 }
 
-
+// Calculate encoder offset
+// TODO: Estimate hysteresis?
 void calibrate_encoder(float voltage){
     disable_foc_loop();
     HAL_GPIO_WritePin(INLX_GPIO_Port, INLX_Pin, 1);
@@ -288,8 +405,7 @@ void apply_duty_at_electrical_angle_int(uint8_t angle, uint8_t magnitude){
 
 enum DriveError check_supply_voltage() {
     if(get_vmotor() < MIN_SUPPLY_VOLTAGE_V){
-        drive_error = drive_error_low_voltage;
-        drive_state = drive_state_error;
+        enter_drive_error(drive_error_low_voltage);
     }
 
     return drive_error;
