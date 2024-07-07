@@ -1,16 +1,15 @@
 #include "drive.h"
 
 
-// Default drive states
 enum DriveError drive_error = drive_error_none;
 enum DriveState drive_state = drive_state_init;
 
-// If true, FOC is allowed to control motor phases
-bool foc_active = false;
+uint16_t voltage_supply_mV;
+
+
+
 
 //////////// VARIABLES
-int max_motor_current_mAmps = 1000;
-
 int estimated_resistance_mOhms = -1;
 
 int16_t current_offsets[256];
@@ -202,7 +201,7 @@ void drive_state_machine(){
 
 
     // Check voltage
-    if(get_vmotor() < MIN_SUPPLY_VOLTAGE_V){
+    if(get_vsupply() < MIN_SUPPLY_VOLTAGE_V){
         enter_drive_error(drive_error_low_voltage);
     }
     osDelay(1);
@@ -264,7 +263,7 @@ void estimate_phase_resistance(float voltage){
     HAL_GPIO_WritePin(INLX_GPIO_Port, INLX_Pin, 1);
 
     // Calculate required duty cycle for voltage
-    float input_voltage = get_vmotor();
+    float input_voltage = get_vsupply();
     float desired_voltage = voltage;
     int duty = (int)((desired_voltage / input_voltage) * 256);
 
@@ -320,7 +319,7 @@ void calibrate_encoder(float voltage){
     HAL_GPIO_WritePin(INLX_GPIO_Port, INLX_Pin, 1);
     
     // Calculate required duty cycle for voltage
-    float input_voltage = get_vmotor();
+    float input_voltage = get_vsupply();
     float desired_voltage = voltage;
     int duty = (int)((desired_voltage / input_voltage) * 256);
     duty = 10;
@@ -404,7 +403,7 @@ void apply_duty_at_electrical_angle_int(uint8_t angle, uint8_t magnitude){
 
 
 enum DriveError check_supply_voltage() {
-    if(get_vmotor() < MIN_SUPPLY_VOLTAGE_V){
+    if(get_vsupply() < MIN_SUPPLY_VOLTAGE_V){
         enter_drive_error(drive_error_low_voltage);
     }
 

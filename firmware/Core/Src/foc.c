@@ -4,13 +4,15 @@
 #define SQRT_2_3 0.8164965809f
 #define SQRT_3 1.7320508076f
 
-uint16_t voltage_supply_mV;
 
-
+// Control mode toggles
+bool foc_active = false;
 bool position_control_enabled = false;
 bool anti_cogging_enabled = false;
 
 // Current Variables
+int max_motor_current_mAmps = 1000;
+
 int position_setpoint_filtered = 0;
 int current_setpoint_limit_mA = 3000;
 int current_Q_setpoint_mA = 0;
@@ -119,9 +121,6 @@ void foc_interrupt(){
 
     encoder_velocity = round(v_hat);
     prev_encoder_position = adjusted_enc_angle;
-
-    // Calculate motor voltage
-    voltage_supply_mV = adc1_dma[0] * 13;
 
     // Calculate motor currents and transform them
     // 9 is a magic number

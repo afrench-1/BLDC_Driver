@@ -38,6 +38,7 @@ void encoder_ISR(){
   }
 }
 
+
 void set_encoder_absolute_offset(){
   // TODO: This is very very hacky and I do not like it
 
@@ -74,8 +75,6 @@ void set_encoder_absolute_offset(){
 
 }
 
-// Calibrate provided ADC
-// TODO: Handle errors
 void calibrate_ADC(ADC_HandleTypeDef *hadc){
   if(HAL_ADCEx_Calibration_Start(hadc, ADC_SINGLE_ENDED) != HAL_OK){
     Error_Handler();
@@ -84,7 +83,7 @@ void calibrate_ADC(ADC_HandleTypeDef *hadc){
 
 void start_ADC(){
 
-  // Calibrate and start adc1 DMA (vmot + temp)
+  // Calibrate and start adc1 DMA (vsupply + temp)
   calibrate_ADC(&hadc1);
   HAL_ADC_Start_DMA(&hadc1, adc1_dma, 4);
 
@@ -93,16 +92,19 @@ void start_ADC(){
   HAL_ADC_Start_DMA(&hadc2, adc2_dma, 3);
 }
 
-// Update and get v motor
-float get_vmotor(){
+float get_vsupply(){
   // float R1 = 100.0f; // kOhms
   // float R2 = 6.8f; // KOhms
   // float adc_constant = 3.3f / 4096.0f * 1.00f;
   // float adc_v = adc1_dma[0] * adc_constant;
   // // volatile float voltage_divider_const = 
   // v_motor_mv = (adc_v * ((R1 + R2) / R2));
-  volatile float v_motor = (adc1_dma[0]*0.000806f / 0.0637f)*1.0f;
-  return v_motor;
+  volatile float v_supply = (adc1_dma[0]*0.000806f / 0.0637f)*1.0f;
+  return v_supply;
+}
+
+uint16_t get_vsupply_mv_fast(){
+  return adc1_dma[0] * 13;
 }
 
 void calibrate_DRV_amps(){

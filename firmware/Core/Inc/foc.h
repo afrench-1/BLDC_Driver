@@ -8,9 +8,6 @@
 #include "trig_luts.h"
 #include "utils.h"
 
-
-extern uint16_t vmotor_mV;
-
 extern int16_t current_A_mA;
 extern int16_t current_B_mA;
 extern int16_t current_C_mA;
