@@ -5,10 +5,10 @@
 #include "stdbool.h"
 #include "math.h"
 
-#define AMP_GAIN 40.0f
-#define SHUNT_VALUE_R 0.002f
-#define ADC_MIDPOINT 2048.0f
+#define AMP_GAIN 40.0f // DRV Amp Gain
+#define SHUNT_VALUE_R 0.002f // Shunt resistance
 #define ADC_MAX 4096.0f
+#define ADC_MIDPOINT ADC_MAX / 2.0f
 
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
@@ -18,7 +18,7 @@ extern uint16_t adc2_dma[3];
 
 extern uint16_t phase_resistance_mOhm[3];
 
-extern uint16_t v_motor_mv;
+extern uint16_t v_supply_mv;
 
 /**
  * @brief Current sense 0 offset

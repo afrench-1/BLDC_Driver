@@ -17,9 +17,11 @@ extern int16_t current_Beta_mA;
 
 extern int16_t angle;
 
-extern uint8_t electrical_angle_offset;
+extern int encoder_velocity;
+extern int adjusted_enc_angle;
 
-extern int16_t current_offsets[256];
+
+extern uint8_t electrical_angle_offset;
 
 /**
  * @brief Set target current setpoints in rotor space
@@ -36,7 +38,7 @@ void set_current_setpoints(int D_setpoint_mA, int Q_setpoint_mA);
  * @brief Runs required FOC functions on TIM6 interrupt at 10KHz
  * 
  */
-void foc_interrupt();
+void current_control_loop();
 
 /**
  * @brief Power invariant Clarke transform, converts from a 3-phase coordinate system to orthogonal coordinates

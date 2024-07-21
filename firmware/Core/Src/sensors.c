@@ -11,7 +11,7 @@ float beta_current;
 
 uint16_t phase_resistance[3]; // Phase resistance in milliohms
 
-uint16_t v_motor_mv; // Motor input voltage in millivolts
+uint16_t v_supply_mv; // Motor input voltage in millivolts
 
 int enc_angle_int;
 uint16_t enc_angle_uint12;
@@ -98,7 +98,7 @@ float get_vsupply(){
   // float adc_constant = 3.3f / 4096.0f * 1.00f;
   // float adc_v = adc1_dma[0] * adc_constant;
   // // volatile float voltage_divider_const = 
-  // v_motor_mv = (adc_v * ((R1 + R2) / R2));
+  // v_supply_mv = (adc_v * ((R1 + R2) / R2));
   volatile float v_supply = (adc1_dma[0]*0.000806f / 0.0637f)*1.0f;
   return v_supply;
 }

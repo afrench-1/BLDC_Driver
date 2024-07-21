@@ -61,6 +61,7 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim15;
+TIM_HandleTypeDef htim16;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -101,6 +102,7 @@ static void MX_TIM6_Init(void);
 static void MX_TIM7_Init(void);
 static void MX_FDCAN1_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_TIM16_Init(void);
 void StartDefaultTask(void *argument);
 void StartStatusBlink(void *argument);
 void StartMainStateLoop(void *argument);
@@ -154,6 +156,7 @@ int main(void)
   MX_TIM7_Init();
   MX_FDCAN1_Init();
   MX_SPI1_Init();
+  MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
   app_setup();
 
@@ -869,6 +872,38 @@ static void MX_TIM15_Init(void)
 }
 
 /**
+  * @brief TIM16 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM16_Init(void)
+{
+
+  /* USER CODE BEGIN TIM16_Init 0 */
+
+  /* USER CODE END TIM16_Init 0 */
+
+  /* USER CODE BEGIN TIM16_Init 1 */
+
+  /* USER CODE END TIM16_Init 1 */
+  htim16.Instance = TIM16;
+  htim16.Init.Prescaler = 144-1;
+  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim16.Init.Period = 999;
+  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim16.Init.RepetitionCounter = 0;
+  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM16_Init 2 */
+
+  /* USER CODE END TIM16_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -880,10 +915,10 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
   /* DMA1_Channel2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
 
 }
@@ -997,8 +1032,6 @@ void StartStatusBlink(void *argument)
   for(;;)
   {
     app_status_led_task();
-    get_fet_temp();
-    get_mot_temp();
   }
   /* USER CODE END StartStatusBlink */
 }
@@ -1033,7 +1066,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
   if(htim->Instance == TIM6){
-    foc_interrupt();
+    current_control_loop();
+  }
+
+  if(htim->Instance == TIM16){
+    control_interrupt();
   }
 
   /* USER CODE END Callback 0 */

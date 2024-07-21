@@ -21,6 +21,26 @@ int bound(int value, int min, int max){
     }
 }
 
+float fbound(float value, float min, float max){
+    if(value < min){
+        return min;
+    }else if(value > max){
+        return max;
+    }else{
+        return value;
+    }
+}
+
+float fbound_sym(float value, float max){
+    if(value < -max){
+        return -max;
+    }else if(value > max){
+        return max;
+    }else{
+        return value;
+    }
+}
+
 bool enforce_bound(int *value, int min, int max){
     if(*value < min){
         *value = min;

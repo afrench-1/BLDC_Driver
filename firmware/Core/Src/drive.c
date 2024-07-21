@@ -7,10 +7,26 @@ enum DriveState drive_state = drive_state_init;
 uint16_t voltage_supply_mV;
 
 
-
-
 //////////// VARIABLES
+float motor_kV = NAN;
+float motor_kT = NAN;
 int estimated_resistance_mOhms = -1;
+
+// Control variables
+float torque_target_Nm = 0.0f;
+float torque_max_Nm = 1.0f;
+
+float velocity_radsps = 0.0f;
+float kV = 0.0f;
+float velocity_target_radsps = 0.0f; 
+float velocity_max_radsps = 50.0f; // ~500 rpm
+
+float kP = 0.0f; // for impedance control
+float kPV = 0.0f; // for cascaded position control
+float position_rads = 0;
+float position_target_rads = 0.0f;
+float position_max_rads = NAN; // no position limit
+float position_min_rads = NAN;
 
 int16_t current_offsets[256];
 
@@ -402,6 +418,54 @@ void apply_duty_at_electrical_angle_int(uint8_t angle, uint8_t magnitude){
 }
 
 
+void control_loop() {
+    // Update voltage (used in foc loop)
+    v_supply_mv = get_vsupply_mv_fast();
+
+    // Convert position to physical units
+    position_rads = (adjusted_enc_angle / 4096.0f) * 2.0f * M_PI;
+
+    // Convert velocity to physical units
+    velocity_radsps = (encoder_velocity / 4096.0f) * 2.0f * M_PI;
+
+    if(drive_state == drive_state_idle){
+        set_torque_setpoint(0.0f);
+
+    } else if(drive_state == drive_state_torque_control){ // Pure torque control
+        set_torque_setpoint(torque_target_Nm);
+
+    } else if(drive_state == drive_state_velocity_control){ // Proportional velocity control
+        float velocity_error = fbound_sym(velocity_target_radsps, velocity_max_radsps) - velocity_radsps;
+        set_torque_setpoint(
+            -kV * velocity_error
+        );
+
+    } else if(drive_state == drive_state_position_control){ // Cascaded position -> velocity control
+        float position_error = position_target_rads - position_rads;
+        float velocity_target = -kPV * position_error;
+
+        float velocity_error = velocity_target - velocity_radsps;
+        set_torque_setpoint(
+            -kV * velocity_error
+        );
+
+    } else if(drive_state = drive_state_impedance_control){ // Combined proportional position and velocity control
+        float position_error = fbound(position_target_rads, position_min_rads, position_max_rads) - position_rads;
+        float velocity_error = fbound_sym(velocity_target_radsps, velocity_max_radsps) - velocity_radsps;
+
+        set_torque_setpoint(
+            -kP * position_error +
+            -kV * velocity_error
+        );
+    }
+}
+
+void set_torque_setpoint(float torque_target_Nm){
+    // Bound target torque and convert to target current using motor kT
+    set_current_setpoints(0, motor_kT * fbound_sym(torque_target_Nm, torque_max_Nm));
+};
+
+
 enum DriveError check_supply_voltage() {
     if(get_vsupply() < MIN_SUPPLY_VOLTAGE_V){
         enter_drive_error(drive_error_low_voltage);
@@ -426,4 +490,10 @@ void set_duty_phases(uint8_t A_value, uint8_t B_value, uint8_t C_value){
     set_duty_phase_A(A_value);
     set_duty_phase_B(B_value);
     set_duty_phase_C(C_value);
+}
+
+void set_V_phases_mv(uint16_t A_value_mv, uint16_t B_value_mv, uint16_t C_value_mv){
+    set_duty_phase_A((A_value_mv * 256) / v_supply_mv);
+    set_duty_phase_B((B_value_mv * 256) / v_supply_mv);
+    set_duty_phase_C((C_value_mv * 256) / v_supply_mv);
 }

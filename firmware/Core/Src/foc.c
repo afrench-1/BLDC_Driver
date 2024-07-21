@@ -4,6 +4,9 @@
 #define SQRT_2_3 0.8164965809f
 #define SQRT_3 1.7320508076f
 
+// Maximum duty cycle, mainly for testing as a hard limit on how much current 
+// can be sent
+#define MAX_VOLTAGE_MV 1000
 
 // Control mode toggles
 bool foc_active = false;
@@ -65,14 +68,13 @@ uint8_t electrical_angle = 0;
 uint8_t electrical_angle_offset = 0;
 int8_t electrical_mechanical_ratio = 21;
 
-int position_setpoint = 0;
-
 void set_current_setpoints(int D_setpoint_mA, int Q_setpoint_mA){
     current_Q_setpoint_mA = Q_setpoint_mA;
     current_D_setpoint_mA = D_setpoint_mA;
 }
 
 
+// Observer
 float q_hat = 0;
 float q_err = 0;
 float v_hat = 0;
@@ -83,11 +85,10 @@ int adjusted_enc_angle = 0;
 
 bool first_run = true;
 
-void foc_interrupt(){
+void current_control_loop(){
     // Calculate electrical angle as a uint8
     // 0 is aligned with phase A
     // 255 is just before wraparound
-
     if( (enc_angle_int - prev_encoder_position) > 0 && direction < 0 ){
         hysteresis_offset = -hysteresis_offset_value;
         direction = 1;
@@ -115,6 +116,8 @@ void foc_interrupt(){
 
     // If encoder has changed, update observer
     // if(prev_encoder_position != adjusted_enc_angle){
+
+    // FLOAT MATH BAD
     q_err = adjusted_enc_angle - q_hat;
     v_hat += 10.0f * q_err - 0.1 * v_hat;
     // }
@@ -134,6 +137,7 @@ void foc_interrupt(){
     // current_B_mA_filtered = current_B_mA;
     // current_C_mA_filtered = current_C_mA;
 
+    // FLOAT MATH BAD
     current_A_mA_filtered = current_A_mA_filtered * 0.05f + current_A_mA * 0.95f;
     current_B_mA_filtered = current_B_mA_filtered * 0.05f + current_B_mA * 0.95f;
     current_C_mA_filtered = current_C_mA_filtered * 0.05f + current_C_mA * 0.95f;
@@ -142,32 +146,6 @@ void foc_interrupt(){
     clarke_transform(current_A_mA_filtered, current_B_mA_filtered, current_C_mA_filtered, &current_Alpha_mA, &current_Beta_mA);
     park_transform(current_Alpha_mA, current_Beta_mA, electrical_angle, &current_D_mA, &current_Q_mA);
 
-    // Generate current setpoint 
-    // TODO: Split this out into another timer interrupt
-
-    if(drive_state == drive_state_position_control || drive_state == drive_state_anti_cogging_calibration){
-        // position_setpoint_filtered = 0.99f * position_setpoint_filtered + position_setpoint * 0.01f;
-        // position_setpoint_filtered = position_setpoint;
-        // current_Q_setpoint_mA = 0.0f * current_Q_setpoint_mA + ((enc_angle_int - position_setpoint_filtered) * 100.0f) * 1.0f;
-        // int vel_setpoint = 500;
-
-        // OLD 10 vel, 1.5 position
-        // int vel_setpoint = 10.0f * (position_setpoint - enc_angle_int - hysteresis_offset);
-        // current_Q_setpoint_mA = -20.0f * (encoder_velocity-vel_setpoint) - 0.0f * vel_setpoint;
-        // current_Q_setpoint_mA = -3.0f * encoder_velocity;
-        // current_Q_setpoint_mA = 300.0f * (position_setpoint_filtered - (enc_angle_int + hysteresis_offset)) - 15.0f * encoder_velocity;
-        current_Q_setpoint_mA = - 10.0f * (encoder_velocity - 1000);
-        // current_Q_setpoint_mA = 5000; 
-
-    } else {
-        current_Q_setpoint_mA = 0;
-    }
-
-     // 1A current setpoint for testing
-
-    // torque_setpoint = (position_setpoint - enc_angle_int) * 1.0f;
-    // current_Q_setpoint_mA = bound( (int16_t) (position_setpoint - enc_angle_int) * 1.0f, -current_setpoint_limit_mA, current_setpoint_limit_mA);
-    // current_Q_setpoint_mA = -1000;
     // Enforce limits on current
     current_Q_setpoint_mA = bound(current_Q_setpoint_mA, -current_setpoint_limit_mA, current_setpoint_limit_mA);
 
@@ -177,16 +155,13 @@ void foc_interrupt(){
     }
 
     float current_gain = 0.002f;
+
     // Q current P loop
-    // TODO: Add an integral term?
     voltage_Q_mV = (current_Q_mA - current_Q_setpoint_mA) * current_gain - current_Q_setpoint_mA * 0.002f ;
-    // voltage_Q_mV = -current_Q_setpoint_mA * 0.001f;
-    // voltage_Q_mV = 20;
-    voltage_Q_mV = (int16_t) bound(voltage_Q_mV, -250, 250);
+    voltage_Q_mV = (int16_t) bound(voltage_Q_mV, -MAX_VOLTAGE_MV, MAX_VOLTAGE_MV); // Enforce duty bounds
     // D current P loop
-    // voltage_D_mV = -(current_D_mA - current_D_setpoint_mA) * current_gain;
-    voltage_D_mV = 0;
-    voltage_D_mV = (int16_t) bound(voltage_D_mV, -250, 250);
+    voltage_D_mV = -(current_D_mA - current_D_setpoint_mA) * current_gain;
+    voltage_D_mV = (int16_t) bound(voltage_D_mV, -MAX_VOLTAGE_MV, MAX_VOLTAGE_MV); // Enforce duty bounds 
 
     // Perform inverse park and clarke transform to convert from rotor-centric voltage into phase voltages
     inverse_park_transform(voltage_D_mV, voltage_Q_mV, electrical_angle, &voltage_Alpha_mV, &voltage_Beta_mV);
@@ -197,11 +172,9 @@ void foc_interrupt(){
 
     int16_t min_voltage_mV = int16_min3(voltage_a_mV, voltage_b_mV, voltage_c_mV);
 
-
     // If FOC is enabled, set voltages
     if(foc_active){
-        // TODO, convert to setting actual voltages instead of duty cycle
-        set_duty_phases(voltage_a_mV - min_voltage_mV, voltage_b_mV - min_voltage_mV, voltage_c_mV - min_voltage_mV);
+        set_duty_phases_mv(voltage_a_mV - min_voltage_mV, voltage_b_mV - min_voltage_mV, voltage_c_mV - min_voltage_mV);
     }
 }
 

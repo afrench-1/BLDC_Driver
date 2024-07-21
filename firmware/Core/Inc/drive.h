@@ -3,10 +3,12 @@
 
 #include "main.h"
 #include "sensors.h"
-#include "math.h"
+#include "foc.h" 
 
 #include "trig_luts.h"
+#include "utils.h"
 
+#include "math.h"
 #include "stdbool.h"
 
 #include "cmsis_os.h"
@@ -61,9 +63,10 @@ enum DriveState {
 
     // Control Modes
     drive_state_idle, // FOC current control at 0, drive must be in idle before other control modes are run
-    drive_state_torque_control,
-    drive_state_velocity_control,
-    drive_state_position_control
+    drive_state_torque_control, // torque -> current
+    drive_state_velocity_control, // vel -> torque -> current
+    drive_state_position_control, // pos -> vel - > torque -> current
+    drive_state_impedance_control // pos + vel -> torque -> current
 };
 
 extern enum DriveState drive_state;
@@ -105,6 +108,8 @@ extern int position_setpoint;
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim6;
+
+extern int16_t current_offsets[256];
 
 
 //////////// FUNCTIONS
@@ -167,6 +172,30 @@ enum DriveError check_supply_voltage();
 void apply_duty_at_electrical_angle_int(uint8_t angle, uint8_t magnitude);
 
 /**
+ * @brief Control loop run at 1kHz
+ * 
+ */
+void control_loop();
+
+/**
+ * @brief Set target torque setpoint.
+ * Internally this multiplies by the torque constant and sets the current setpoint.
+ * 
+ * @param torque_target_Nm Target torque in Newton Meters
+ * 
+ * @note motor_kT must be set for this to work
+ */
+void set_torque_setpoint(float torque_target_Nm);
+
+/**
+ * @brief Checks supply voltage. 
+ * If voltage is lower than MIN_SUPPLY_VOLTAGE enter drive_error_low_voltage
+ * 
+ * @return enum DriveError 
+ */
+enum DriveError check_supply_voltage();
+
+/**
  * @brief Set phase A PWM duty cycle
  * 
  * @param value PWM magnitude as a uint8 (out of 256)
@@ -188,12 +217,22 @@ void set_duty_phase_B(uint8_t value);
 void set_duty_phase_C(uint8_t value);
 
 /**
- * @brief Set all duty PWM phases together
+ * @brief Set all phases duty cycle
  * 
  * @param A_value PWM magnitude as a uint8 (out of 256)
  * @param B_value PWM magnitude as a uint8 (out of 256)
  * @param C_value PWM magnitude as a uint8 (out of 256)
  */
 void set_duty_phases(uint8_t A_value, uint8_t B_value, uint8_t C_value);
+
+
+/**
+ * @brief Set all phase voltages in millivolts
+ * 
+ * @param A_value_mv voltage in mV
+ * @param B_value_mv voltage in mV
+ * @param C_value_mv voltage in mV
+ */
+void  set_V_phases_mv(uint16_t A_value_mv, uint16_t B_value_mv, uint16_t C_value_mv);
 
 #endif
