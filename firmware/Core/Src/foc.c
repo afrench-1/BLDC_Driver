@@ -4,20 +4,13 @@
 #define SQRT_2_3 0.8164965809f
 #define SQRT_3 1.7320508076f
 
-// Maximum duty cycle, mainly for testing as a hard limit on how much current 
-// can be sent
-#define MAX_VOLTAGE_MV 1000
-
 // Control mode toggles
 bool foc_active = false;
-bool position_control_enabled = false;
 bool anti_cogging_enabled = false;
 
 // Current Variables
-int max_motor_current_mAmps = 1000;
+uint16_t maximum_motor_current_mA = 5000;
 
-int position_setpoint_filtered = 0;
-int current_setpoint_limit_mA = 3000;
 int current_Q_setpoint_mA = 0;
 int current_D_setpoint_mA = 0;
 
@@ -26,7 +19,7 @@ int16_t current_B_mA = 0;
 int16_t current_C_mA = 0;
 
 int16_t current_A_offset_mA = 0;
-int16_t current_C_offset_mA = -51;
+int16_t current_C_offset_mA = 0;
 
 int16_t current_A_mA_filtered = 0;
 int16_t current_B_mA_filtered = 0;
@@ -36,11 +29,14 @@ int16_t current_Alpha_mA = 0;
 int16_t current_Beta_mA = 0;
 
 int16_t current_D_mA = 0;
+int16_t current_D_mA_error = 0;
+int32_t current_D_mA_error_integral = 0;
 int16_t current_Q_mA = 0;
-
+int16_t current_Q_mA_error = 0;
+int32_t current_Q_mA_error_integral = 0;
 
 // Voltage Variables
-int8_t maximum_duty = 200;
+uint16_t maximum_motor_voltage_mV = 25000;
 
 int16_t voltage_D_mV = 0;
 int16_t voltage_Q_mV = 0;
@@ -59,7 +55,8 @@ int prev_hysteresis_offset = 0;
 
 // Gains
 // TODO: Choose this based on motor resistance and inductance
-float current_P_gain = 0.04f;
+float current_P_gain = 0.2f;
+float current_I_gain = 0.015f;
 
 // Angle
 int prev_encoder_position = 0;
@@ -114,13 +111,9 @@ void current_control_loop(){
     // Estimate new position
     q_hat += dt * v_hat;
 
-    // If encoder has changed, update observer
-    // if(prev_encoder_position != adjusted_enc_angle){
-
     // FLOAT MATH BAD
     q_err = adjusted_enc_angle - q_hat;
     v_hat += 10.0f * q_err - 0.1 * v_hat;
-    // }
 
     encoder_velocity = round(v_hat);
     prev_encoder_position = adjusted_enc_angle;
@@ -130,51 +123,47 @@ void current_control_loop(){
     // TODO: Document 9
     current_A_mA =  (adc2_dma[0] - adc2_calib_offset[0]) * 9;
     current_C_mA =  (adc2_dma[1] - adc2_calib_offset[1]) * 9;
-    current_B_mA =  - (current_A_mA + current_C_mA);
-
-    // Perform an IIR filter on current to cut down on noise and injected vibrations
-    // current_A_mA_filtered = current_A_mA;
-    // current_B_mA_filtered = current_B_mA;
-    // current_C_mA_filtered = current_C_mA;
-
-    // FLOAT MATH BAD
-    current_A_mA_filtered = current_A_mA_filtered * 0.05f + current_A_mA * 0.95f;
-    current_B_mA_filtered = current_B_mA_filtered * 0.05f + current_B_mA * 0.95f;
-    current_C_mA_filtered = current_C_mA_filtered * 0.05f + current_C_mA * 0.95f;
+    current_B_mA =  - (current_A_mA + current_C_mA); // Ignore noisy ADC
 
     // Perform clarke and park transform to get motor current in orthogonal rotor-centric coordinates
-    clarke_transform(current_A_mA_filtered, current_B_mA_filtered, current_C_mA_filtered, &current_Alpha_mA, &current_Beta_mA);
+    clarke_transform(current_A_mA, current_B_mA, current_C_mA, &current_Alpha_mA, &current_Beta_mA);
     park_transform(current_Alpha_mA, current_Beta_mA, electrical_angle, &current_D_mA, &current_Q_mA);
 
     // Enforce limits on current
-    current_Q_setpoint_mA = bound(current_Q_setpoint_mA, -current_setpoint_limit_mA, current_setpoint_limit_mA);
+    current_Q_setpoint_mA = bound(current_Q_setpoint_mA, -maximum_motor_current_mA, maximum_motor_current_mA);
 
     // Feedforward for anti-cogging
-    if(anti_cogging_enabled){
-        current_Q_setpoint_mA += current_offsets[electrical_angle] * 1.0f;
-    }
-
-    float current_gain = 0.002f;
+    // if(anti_cogging_enabled){
+    //     current_Q_setpoint_mA += current_offsets[electrical_angle] * 1.0f;
+    // }
 
     // Q current P loop
-    voltage_Q_mV = (current_Q_mA - current_Q_setpoint_mA) * current_gain - current_Q_setpoint_mA * 0.002f ;
-    voltage_Q_mV = (int16_t) bound(voltage_Q_mV, -MAX_VOLTAGE_MV, MAX_VOLTAGE_MV); // Enforce duty bounds
+    current_Q_mA_error = (current_Q_mA - current_Q_setpoint_mA);
+    current_Q_mA_error_integral += current_Q_mA_error;
+    voltage_Q_mV = current_Q_mA_error * current_P_gain + current_Q_mA_error_integral * current_I_gain;
+    voltage_Q_mV = (int16_t) bound(voltage_Q_mV, -maximum_motor_voltage_mV, maximum_motor_voltage_mV); // Enforce duty bounds
     // D current P loop
-    voltage_D_mV = -(current_D_mA - current_D_setpoint_mA) * current_gain;
-    voltage_D_mV = (int16_t) bound(voltage_D_mV, -MAX_VOLTAGE_MV, MAX_VOLTAGE_MV); // Enforce duty bounds 
+    current_D_mA_error = -(current_D_mA - current_D_setpoint_mA);
+    current_D_mA_error_integral += current_D_mA_error;
+    voltage_D_mV = current_D_mA_error * current_P_gain + + current_D_mA_error_integral * current_I_gain;
+    voltage_D_mV = (int16_t) bound(voltage_D_mV, -maximum_motor_voltage_mV, maximum_motor_voltage_mV); // Enforce duty bounds 
 
     // Perform inverse park and clarke transform to convert from rotor-centric voltage into phase voltages
     inverse_park_transform(voltage_D_mV, voltage_Q_mV, electrical_angle, &voltage_Alpha_mV, &voltage_Beta_mV);
     inverse_clarke_transform(voltage_Alpha_mV, voltage_Beta_mV, &voltage_a_mV, &voltage_b_mV, &voltage_c_mV);
+    
     // Find minimum voltage to offset phase voltages to be all positive
     // Might be worth experimenting with centering phases around V_supply/2 to avoid this
     // there might be additional consequences
-
     int16_t min_voltage_mV = int16_min3(voltage_a_mV, voltage_b_mV, voltage_c_mV);
 
     // If FOC is enabled, set voltages
     if(foc_active){
-        set_duty_phases_mv(voltage_a_mV - min_voltage_mV, voltage_b_mV - min_voltage_mV, voltage_c_mV - min_voltage_mV);
+        set_V_phases_mv(voltage_a_mV - min_voltage_mV, voltage_b_mV - min_voltage_mV, voltage_c_mV - min_voltage_mV);
+    } else {
+        // Zero out integrals if not
+        current_Q_mA_error_integral = 0;
+        current_D_mA_error_integral = 0;
     }
 }
 

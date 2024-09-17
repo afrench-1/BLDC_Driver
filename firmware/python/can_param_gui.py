@@ -12,7 +12,7 @@ from FxFDrive import DriveError, DriveState
 bus = make_can_bus()
 print("Bus running")
 
-
+ 
 available_drives = list_available_drives(bus)
 
 drives = []
@@ -98,10 +98,6 @@ class GUI(object):
                             # if(self.drive.can_id == 11):
                             #     self.drive.set_parameter_int(self.drive.parameters.PARAM_ENCODER_OFFSET, 49, 1)
 
-                            self.color = [self.drive.parameters.run_led_colors[0] / 255.0,
-                                self.drive.parameters.run_led_colors[1] / 255.0,
-                                self.drive.parameters.run_led_colors[2] / 255.0]
-
             drive_voltage = self.drive.telemetry.get_motor_voltage_V()
             motor_position = self.drive.telemetry.get_motor_position_revs()
             motor_velocity = self.drive.telemetry.get_motor_velocity_encoder_raw()
@@ -155,13 +151,6 @@ class GUI(object):
 
             # show, _ = imgui.collapsing_header("Telemetry")
             imgui.text("Parameters")
-            changed, self.color = imgui.color_edit3("LED Color", *self.color)
-
-            if(changed):
-                self.drive.parameters.run_led_colors = [self.color[0] * 255,
-                                                self.color[1] * 255,
-                                                self.color[2] * 255]
-                self.drive.write_parameters()
 
             imgui.drag_float(
                 "Phase resistance", self.drive.parameters.phase_resistance, 0.1, 0.0, 0.0, "%.02f Ohms"

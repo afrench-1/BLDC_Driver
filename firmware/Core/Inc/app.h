@@ -34,8 +34,6 @@ extern int16_t current_D_mA;
 extern int16_t angle;
 extern uint8_t electrical_angle;
 
-extern int position_setpoint;
-
 /**
  * @brief Run during MCU init to initialise various perihperals.
  * 

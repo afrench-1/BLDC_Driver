@@ -63,6 +63,20 @@ void CAN_Transmit_Value_Bool(uint8_t value, bool boolean)
     CAN_Transmit_Array(array, 2); 
 }
 
+void CAN_transmit_float3(float value, uint16_t scale, uint8_t id) {
+    uint8_t send_array[] = {
+        id,
+        ((int) (value * scale) >> 0) & 0xFF,
+        ((int) (value * scale) >> 8) & 0xFF,
+        ((int) (value * scale) >> 16) & 0xFF
+    };
+    CAN_Transmit_Array(send_array, 4);
+}
+
+float CAN_unpack_float3(uint8_t RxData[], uint16_t scale) {
+    return (RxData[1] |  RxData[2] << 8 | RxData[3] << 16) / (float) scale;
+}
+
 void init_and_start_can()
 {
     // Set unique hardware identifier
@@ -381,20 +395,39 @@ void handle_diagnostic_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
 void handle_action_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
     int msg_type = RxData[0];
 
-    if(msg_type == ACTION_MOTOR_POSITION_SETPOINT){
+
+    // Control targets
+    if(msg_type == ACTION_TORQUE_SETPOINT){
         int setpoint = RxData[1] | RxData[2] << 8 | RxData[3] << 16;
         if(setpoint > 16777216/2){
             setpoint = setpoint - 16777216;
         }
- 
-        position_setpoint = setpoint;
+        torque_target_Nm = setpoint / 1000.0f;
     }
+
+    if(msg_type == ACTION_VELOCITY_SETPOINT){
+        int setpoint = RxData[1] | RxData[2] << 8 | RxData[3] << 16;
+        if(setpoint > 16777216/2){
+            setpoint = setpoint - 16777216;
+        }
+        velocity_target_radsps = setpoint / 1000.0f;
+    }
+
+    if(msg_type == ACTION_POSITION_SETPOINT){
+        int setpoint = RxData[1] | RxData[2] << 8 | RxData[3] << 16;
+        if(setpoint > 16777216/2){
+            setpoint = setpoint - 16777216;
+        }
+        position_target_rads = setpoint / 1000.0f;
+    }
+
+
+
 
 
     // State transitions
     if(msg_type == ACTION_REQUEST_STATE_CHANGE){
         enum DriveState new_state = RxData[1];
-
         // Request state change and transmit result
         bool result = request_drive_state_change(new_state);
         CAN_Transmit_Bool(result);
@@ -408,25 +441,17 @@ void handle_telemetry_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
 
     if(msg_type == TELEM_MOTOR_VOLTAGE){
         uint8_t array[] = {TELEM_MOTOR_VOLTAGE, 
-                            (voltage_supply_mV) & 0xFF, 
-                            (voltage_supply_mV >> 8) & 0xFF};
+                            (v_supply_mv) & 0xFF, 
+                            (v_supply_mv >> 8) & 0xFF};
         CAN_Transmit_Array(array, 3);
     }
 
     if(msg_type == TELEM_MOTOR_POSITION){
-        uint8_t array[] = {TELEM_MOTOR_POSITION, 
-                            ((enc_angle_int + hysteresis_offset)) & 0xFF, 
-                            ((enc_angle_int + hysteresis_offset) >> 8) & 0xFF,
-                            ((enc_angle_int + hysteresis_offset) >> 16) & 0xFF};
-        CAN_Transmit_Array(array, 4);
+        CAN_transmit_float3(position_rads, 1000, TELEM_MOTOR_POSITION);
     }
 
     if(msg_type == TELEM_MOTOR_VELOCITY){
-        uint8_t array[] = {TELEM_MOTOR_VELOCITY, 
-                            ((int) round(v_hat)) & 0xFF, 
-                            ((int) round(v_hat) >> 8) & 0xFF,
-                            ((int) round(v_hat) >> 16) & 0xFF};
-        CAN_Transmit_Array(array, 4);
+        CAN_transmit_float3(velocity_radsps, 1000, TELEM_MOTOR_VELOCITY);
     }
 
 
@@ -465,23 +490,23 @@ void handle_parameter_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
     uint8_t dlc = (RxHeader.DataLength / FDCAN_DLC_BYTES_1);
     bool param_set = dlc > 1;
 
-    if(msg_type == PARAM_LED_COLOR){
-        if(dlc == 4){
-            run_LED_colors[0] = RxData[1];
-            run_LED_colors[1] = RxData[2];
-            run_LED_colors[2] = RxData[3];
-            CAN_Transmit_Value_Bool(PARAM_LED_COLOR, true);
-        } else if(dlc == 1){
-            uint8_t send_array[] = {
-                PARAM_LED_COLOR,
-                run_LED_colors[0],
-                run_LED_colors[1],
-                run_LED_colors[2]};
-            CAN_Transmit_Array(send_array, 4);
-        } else {
-            CAN_Transmit_Value_Bool(PARAM_LED_COLOR, false);
-        }
-    }
+    // if(msg_type == PARAM_LED_COLOR){
+    //     if(dlc == 4){
+    //         run_LED_colors[0] = RxData[1];
+    //         run_LED_colors[1] = RxData[2];
+    //         run_LED_colors[2] = RxData[3];
+    //         CAN_Transmit_Value_Bool(PARAM_LED_COLOR, true);
+    //     } else if(dlc == 1){
+    //         uint8_t send_array[] = {
+    //             PARAM_LED_COLOR,
+    //             run_LED_colors[0],
+    //             run_LED_colors[1],
+    //             run_LED_colors[2]};
+    //         CAN_Transmit_Array(send_array, 4);
+    //     } else {
+    //         CAN_Transmit_Value_Bool(PARAM_LED_COLOR, false);
+    //     }
+    // }
 
     if(msg_type == PARAM_PHASE_RESISTANCE){
         if(dlc == 1){
@@ -496,23 +521,44 @@ void handle_parameter_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
         }
     }
 
-    if(msg_type == PARAM_CURRENT_LIMIT){
+    if(msg_type == PARAM_MAXIMUM_MOTOR_CURRENT){
         if(dlc == 1){
             uint8_t send_array[] = {
-                PARAM_CURRENT_LIMIT,
-                (current_setpoint_limit_mA >> 0) & 0xFF,
-                (current_setpoint_limit_mA >> 8) & 0xFF
+                PARAM_MAXIMUM_MOTOR_CURRENT,
+                (maximum_motor_current_mA >> 0) & 0xFF,
+                (maximum_motor_current_mA >> 8) & 0xFF
             };
             CAN_Transmit_Array(send_array, 3);
         } else if(dlc == 3) {
-            int new_current_setpoint_limit_mA = (uint16_t) RxData[1] << 0 | 
+            int new_max = (uint16_t) RxData[1] << 0 | 
                                      RxData[2] << 8;
-            // Safety limit of 10A
-            if(new_current_setpoint_limit_mA < 15000){
-                current_setpoint_limit_mA = new_current_setpoint_limit_mA;
-                CAN_Transmit_Value_Bool(PARAM_CURRENT_LIMIT, true);
+            // Safety limit
+            if(new_max < 20000){
+                maximum_motor_current_mA = new_max;
+                CAN_Transmit_Value_Bool(PARAM_MAXIMUM_MOTOR_CURRENT, true);
             }else{
-                CAN_Transmit_Value_Bool(PARAM_CURRENT_LIMIT, false);
+                CAN_Transmit_Value_Bool(PARAM_MAXIMUM_MOTOR_CURRENT, false);
+            }
+        }
+    }
+
+    if(msg_type == PARAM_MAXIMUM_MOTOR_VOLTAGE){
+        if(dlc == 1){
+            uint8_t send_array[] = {
+                PARAM_MAXIMUM_MOTOR_CURRENT,
+                (maximum_motor_voltage_mV >> 0) & 0xFF,
+                (maximum_motor_voltage_mV >> 8) & 0xFF
+            };
+            CAN_Transmit_Array(send_array, 3);
+        } else if(dlc == 3) {
+            int new_max = (uint16_t) RxData[1] << 0 | 
+                                     RxData[2] << 8;
+            // Safety limit
+            if(new_max < 15000){
+                maximum_motor_voltage_mV = new_max;
+                CAN_Transmit_Value_Bool(PARAM_MAXIMUM_MOTOR_CURRENT, true);
+            }else{
+                CAN_Transmit_Value_Bool(PARAM_MAXIMUM_MOTOR_CURRENT, false);
             }
         }
     }
@@ -521,7 +567,7 @@ void handle_parameter_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
         if(dlc == 1){
             uint8_t send_array[] = {
                 PARAM_ENCODER_OFFSET,
-                (electrical_angle_offset >> 0) & 0xFF
+                (electrical_angle_offset >> 0) & 0xFF,
             };
             CAN_Transmit_Array(send_array, 2);
         } else if(dlc == 2) {
@@ -561,6 +607,35 @@ void handle_parameter_RX(FDCAN_RxHeaderTypeDef RxHeader, uint8_t RxData[]){
             CAN_Transmit_Value_Bool(PARAM_ANTI_COGGING, false);
         }
     }
+
+
+    if(msg_type == PARAM_KP){
+        if(dlc == 1){
+            CAN_transmit_float3(kP, 1000, PARAM_KP);
+        } else if(dlc == 4) {
+            kP = CAN_unpack_float3(RxData, 1000);
+            CAN_Transmit_Value_Bool(PARAM_KP, true);
+        }
+    }
+    if(msg_type == PARAM_KPV){
+        if(dlc == 1){
+            CAN_transmit_float3(kPV, 1000, PARAM_KPV);
+        } else if(dlc == 4) {
+            kPV = CAN_unpack_float3(RxData, 1000);
+            CAN_Transmit_Value_Bool(PARAM_KPV, true);
+        }
+    }
+    if(msg_type == PARAM_KV){
+        if(dlc == 1){
+            CAN_transmit_float3(kV, 1000, PARAM_KV);
+        } else if(dlc == 4) {
+            kV = CAN_unpack_float3(RxData, 1000);
+            CAN_Transmit_Value_Bool(PARAM_KV, true);
+        }
+    }
+
+
+
 }
 
 

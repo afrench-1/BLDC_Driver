@@ -9,19 +9,19 @@ uint16_t voltage_supply_mV;
 
 //////////// VARIABLES
 float motor_kV = NAN;
-float motor_kT = NAN;
+float motor_kT = 1.0f;
 int estimated_resistance_mOhms = -1;
 
 // Control variables
 float torque_target_Nm = 0.0f;
-float torque_max_Nm = 1.0f;
+float torque_max_Nm = 20.0f;
 
 float velocity_radsps = 0.0f;
 float kV = 0.0f;
 float velocity_target_radsps = 0.0f; 
-float velocity_max_radsps = 50.0f; // ~500 rpm
+float velocity_max_radsps = 100.0f; // ~1000 rpm
 
-float kP = 0.0f; // for impedance control
+float kP = 0.5f; // for impedance control
 float kPV = 0.0f; // for cascaded position control
 float position_rads = 0;
 float position_target_rads = 0.0f;
@@ -98,20 +98,36 @@ bool request_drive_state_change(enum DriveState new_state){
         return true;
     }
 
-    // Idle -> Position
-    if(new_state == drive_state_position_control && drive_state == drive_state_idle){
-        position_setpoint = enc_angle_int;
-        drive_state = drive_state_position_control;
+    // Idle -> Any control mode
+    if((new_state == drive_state_torque_control ||
+        new_state == drive_state_velocity_control ||
+        new_state == drive_state_position_control ||
+        new_state == drive_state_velocity_control)
+       && drive_state == drive_state_idle){
+        drive_state = new_state;
         return true;
     }
-    // Position -> disabled
-    if(new_state == drive_state_disabled && drive_state == drive_state_position_control){
-        drive_state = drive_state_disabled;
-        return true;
-    }
-    // Position -> Idle
-    if(new_state == drive_state_idle && drive_state == drive_state_position_control){
+
+
+    // Any control mode -> Idle
+    if((new_state == drive_state_idle) 
+       && (drive_state == drive_state_torque_control ||
+           drive_state == drive_state_velocity_control ||
+           drive_state == drive_state_position_control ||
+           drive_state == drive_state_impedance_control) ){
         drive_state = drive_state_idle;
+        return true;
+    }
+
+    // Any control mode -> disabled
+    if((new_state == drive_state_disabled) 
+       && (
+           drive_state == drive_state_idle ||
+           drive_state == drive_state_torque_control ||
+           drive_state == drive_state_velocity_control ||
+           drive_state == drive_state_position_control ||
+           drive_state == drive_state_impedance_control) ){
+        drive_state = drive_state_disabled;
         return true;
     }
 
@@ -140,6 +156,13 @@ void drive_init(){
     // Make sure FOC loop is disabled
     disable_foc_loop();
     HAL_TIM_Base_Start_IT(&htim6);
+
+    // Start 1kHz control looop
+    HAL_TIM_Base_Start_IT(&htim16);
+
+
+    // Read in memory values
+    electrical_angle_offset = mem_read_uint8(2, 0);
 }
 
 
@@ -181,7 +204,7 @@ void drive_state_machine(){
             break;
 
         case drive_state_encoder_calibration:
-            calibrate_encoder(2.0f);
+            calibrate_encoder(4.0f);
             if(drive_state != drive_state_error){
                 drive_state = drive_state_disabled;
             }
@@ -217,6 +240,7 @@ void drive_state_machine(){
 
 
     // Check voltage
+    // TODO make this fast
     if(get_vsupply() < MIN_SUPPLY_VOLTAGE_V){
         enter_drive_error(drive_error_low_voltage);
     }
@@ -227,44 +251,45 @@ void drive_state_machine(){
 
 
 void anti_cogging_calibration(float current){
+    // TODO finish this
     // TODO allow current and P (I?) gains to be adjusted
 
     // Enable FOC, disable anti-cogging, move the motor to 0 and wait for it to settle
-    enable_foc_loop();
+    // enable_foc_loop();
+    // anti_cogging_enabled = false;
+    
+    // position_target_rads = 0; // TODO: this is bad
+    // osDelay(1000);
+
+    // // Zero out offset table
+    // for(int i = 0; i < 256; i++){
+    //     current_offsets[i] = 0;
+    // }
+
+    // // Move backward 4 electrical revs
+    // for(int i = 0; i<256 * 4; i++){
+    //     position_target_rads = -i * 2;
+    //     osDelay(10);
+    //     uint8_t setpoint_electrical_angle = (position_target_rads % (4096 / 8) / 2 + electrical_angle_offset);
+    //     current_offsets[setpoint_electrical_angle] += current_Q_setpoint_mA;
+    // }
+
+    // // Move forward 4 electrical revs
+    // for(int i = 0; i<256 * 4; i++){
+    //     position_target_rads = i * 2 - 255 * 4 * 2;
+    //     osDelay(10);
+    //     uint8_t setpoint_electrical_angle = (position_target_rads % (4096 / 8) / 2 + electrical_angle_offset);
+    //     current_offsets[setpoint_electrical_angle] += current_Q_setpoint_mA;
+    // }
+
+    // // Average samples
+    // for(int i = 0; i < 256; i++){
+    //     current_offsets[i] = current_offsets[i] / 8;
+    // }
+    
+    // // Disable FOC loop and enable anti-cogging
+    // disable_foc_loop();
     anti_cogging_enabled = false;
-    
-    position_setpoint = 0; // TODO: this is bad
-    osDelay(1000);
-
-    // Zero out offset table
-    for(int i = 0; i < 256; i++){
-        current_offsets[i] = 0;
-    }
-
-    // Move backward 4 electrical revs
-    for(int i = 0; i<256 * 4; i++){
-        position_setpoint = -i * 2;
-        osDelay(10);
-        uint8_t setpoint_electrical_angle = (position_setpoint % (4096 / 8) / 2 + electrical_angle_offset);
-        current_offsets[setpoint_electrical_angle] += current_Q_setpoint_mA;
-    }
-
-    // Move forward 4 electrical revs
-    for(int i = 0; i<256 * 4; i++){
-        position_setpoint = i * 2 - 255 * 4 * 2;
-        osDelay(10);
-        uint8_t setpoint_electrical_angle = (position_setpoint % (4096 / 8) / 2 + electrical_angle_offset);
-        current_offsets[setpoint_electrical_angle] += current_Q_setpoint_mA;
-    }
-
-    // Average samples
-    for(int i = 0; i < 256; i++){
-        current_offsets[i] = current_offsets[i] / 8;
-    }
-    
-    // Disable FOC loop and enable anti-cogging
-    disable_foc_loop();
-    anti_cogging_enabled = true;
 }
 
 // Currently only checks phase A as that amp seems to be the most accurate
@@ -338,7 +363,7 @@ void calibrate_encoder(float voltage){
     float input_voltage = get_vsupply();
     float desired_voltage = voltage;
     int duty = (int)((desired_voltage / input_voltage) * 256);
-    duty = 10;
+    duty = 30;
 
     volatile int offset_average = 0;
 
@@ -401,6 +426,8 @@ void calibrate_encoder(float voltage){
 
 
     electrical_angle_offset = offset_average / (256 * 4);
+
+    mem_write_uint8(electrical_angle_offset, 2, 0);
     printf("lmao");
 }
 
@@ -435,7 +462,7 @@ void control_loop() {
         set_torque_setpoint(torque_target_Nm);
 
     } else if(drive_state == drive_state_velocity_control){ // Proportional velocity control
-        float velocity_error = fbound_sym(velocity_target_radsps, velocity_max_radsps) - velocity_radsps;
+        float velocity_error = velocity_radsps - fbound_sym(velocity_target_radsps, velocity_max_radsps);
         set_torque_setpoint(
             -kV * velocity_error
         );
@@ -449,9 +476,9 @@ void control_loop() {
             -kV * velocity_error
         );
 
-    } else if(drive_state = drive_state_impedance_control){ // Combined proportional position and velocity control
-        float position_error = fbound(position_target_rads, position_min_rads, position_max_rads) - position_rads;
-        float velocity_error = fbound_sym(velocity_target_radsps, velocity_max_radsps) - velocity_radsps;
+    } else if(drive_state == drive_state_impedance_control){ // Combined proportional position and velocity control
+        float position_error = position_rads - fbound(position_target_rads, position_min_rads, position_max_rads);
+        float velocity_error = velocity_radsps - fbound_sym(velocity_target_radsps, velocity_max_radsps);
 
         set_torque_setpoint(
             -kP * position_error +
@@ -462,7 +489,7 @@ void control_loop() {
 
 void set_torque_setpoint(float torque_target_Nm){
     // Bound target torque and convert to target current using motor kT
-    set_current_setpoints(0, motor_kT * fbound_sym(torque_target_Nm, torque_max_Nm));
+    set_current_setpoints(0, motor_kT * fbound_sym(torque_target_Nm, torque_max_Nm) * 1000);
 };
 
 

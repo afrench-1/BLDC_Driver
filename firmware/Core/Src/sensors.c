@@ -31,7 +31,8 @@ bool get_dip(int dip_num){
 }
 
 void encoder_ISR(){
-  if(start_up_pulses || HAL_GPIO_ReadPin(IFB_GPIO_Port, IFB_Pin)){
+  // TODO: Why
+  if(HAL_GPIO_ReadPin(IFB_GPIO_Port, IFB_Pin) == HAL_GPIO_ReadPin(IFA_GPIO_Port, IFA_Pin)){
     enc_angle_int ++;
   }else{
     enc_angle_int --;
@@ -44,34 +45,16 @@ void set_encoder_absolute_offset(){
 
   // GET PULSE COUNT
   // Disable magnetic encoder
-  start_up_pulses = true;
   HAL_GPIO_WritePin(ENC_EN_GPIO_Port, ENC_EN_Pin, 1);
-  app_delay_ms(20);
+  app_delay_ms(50);
 
   // Reset angle
   enc_angle_int = 0;
   // Enable magnetic encoder
   HAL_GPIO_WritePin(ENC_EN_GPIO_Port, ENC_EN_Pin, 0);
-  app_delay_ms(10);
-  // HAL_Delay(10);
-  start_up_pulse_count = enc_angle_int;
-
-  // FIND DIRECTION
-  start_up_pulses = false;
-  HAL_GPIO_WritePin(ENC_EN_GPIO_Port, ENC_EN_Pin, 1);
   app_delay_ms(15);
-  // Reset angle
-  enc_angle_int = 0;
-  // Enable magnetic encoder
-  HAL_GPIO_WritePin(ENC_EN_GPIO_Port, ENC_EN_Pin, 0);
-  app_delay_ms(10);
-  // Adjust startup pulse direction
-  if(enc_angle_int < 0){
-    enc_angle_int = start_up_pulse_count;
-  }else{
-    enc_angle_int = -start_up_pulse_count;
-  }
-
+  // }
+  printf("lmao");
 
 }
 

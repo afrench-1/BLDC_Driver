@@ -4,6 +4,7 @@
 #include "main.h"
 #include "sensors.h"
 #include "foc.h" 
+#include "mem.h"
 
 #include "trig_luts.h"
 #include "utils.h"
@@ -79,15 +80,7 @@ extern bool anti_cogging_enabled;
 
 //////////// VARIABLES
 
-/**
- * @brief Maximum motor current in milliAmps that the FOC loop is allowed to apply
- * 
- * @warning This is not an error-generating limit, and only applies to the FOC loop. 
- *          If other parts of the program command more current (e.g. through a voltage based PWM function)
- *          they are not be limited through this.
- * 
- */
-extern int max_motor_current_mAmps;
+extern uint16_t v_supply_mv;
 
 /**
  * @brief Estimated phase resistance in milliOhms
@@ -102,12 +95,27 @@ extern int8_t electrical_mechanical_ratio;
 
 extern int current_Q_setpoint_mA;
 
-extern int position_setpoint;
+extern float torque_target_Nm;
+extern float torque_max_Nm;
+
+extern float velocity_radsps;
+extern float velocity_target_radsps;
+extern float velocity_max_radsps;
+
+extern float position_rads;
+extern float position_target_rads;
+extern float position_min_rads;
+extern float position_max_rads;
+
+extern float kP;
+extern float kPV;
+extern float kV;
 
 //////////// EXTERNS
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim6;
+extern TIM_HandleTypeDef htim16;
 
 extern int16_t current_offsets[256];
 

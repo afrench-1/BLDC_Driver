@@ -17,6 +17,9 @@ extern int16_t current_Beta_mA;
 
 extern int16_t angle;
 
+extern uint16_t maximum_motor_current_mA;
+extern uint16_t maximum_motor_voltage_mV;
+
 extern int encoder_velocity;
 extern int adjusted_enc_angle;
 

@@ -29,17 +29,21 @@ void app_setup(){
 }
 
 
-int led_clock = 0;
+uint32_t led_clock = 0;
 
 void app_status_led_task(){
     led_clock += 1;
 
     switch(drive_state){
         case drive_state_error:
-            led_rgb(1.0, 0, 0);
-            osDelay(50);
-            led_rgb(0, 0, 0);
-            osDelay(150);
+            // led_rgb(1.0, 0, 0);
+            // osDelay(50);
+            // led_rgb(0, 0, 0);
+            // osDelay(150);
+
+            // float value = 1.0f;
+
+            led_hsv(0.0f, 1.0f, (100 - led_clock % 100) / 150.0f - 0.1f);
             break;
         case drive_state_disabled:
             led_hsv(182.0f, 1.0f, sin(led_clock/50.0f) * 0.2f + 0.4f);

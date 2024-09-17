@@ -12,12 +12,19 @@ SYS_LIST_ALL_MSG_ID = 5
 
 class DriveState(Enum):
     drive_state_error = 0
-    drive_state_disabled = 1
-    drive_state_resistance_estimation = 2
-    drive_state_encoder_calibration = 3
-    drive_state_anti_cogging_calibration = 4
-    drive_state_idle = 5
-    drive_state_position_control = 6
+    drive_state_init = 1
+    drive_state_disabled = 2
+
+    drive_state_resistance_estimation = 3
+    drive_state_encoder_calibration = 4
+    drive_state_full_calibration = 5
+    drive_state_anti_cogging_calibration = 6
+
+    drive_state_idle = 7
+    drive_state_torque_control = 8
+    drive_state_velocity_control = 9
+    drive_state_position_control = 10
+    drive_state_impedance_control = 11
 
 class DriveError(Enum):
     drive_error_none = 0
@@ -100,20 +107,34 @@ def list_available_drives(bus):
     return messages
 
 class Parameters:
-    PARAM_LED_COLOR = 150
-    PARAM_PHASE_RESISTANCE = 160
-    PARAM_ENCODER_OFFSET = 161
-    PARAM_ANTI_COGGING_TABLE = 162
-    PARAM_ANTI_COGGING = 170
+    PARAM_ENCODER_OFFSET = 150# [offset]
+    PARAM_RATIO = 151 # [ratio] SIGNED
 
-    PARAM_CURRENT_GAIN = 180
-    PARAM_CURRENT_LIMIT = 181
-    PARAM_POSITION_GAIN = 185
+    PARAM_CURRENT_P_GAIN = 155 # [p_gain p_gain p_gain p_gain] gain / 1000
+    PARAM_CURRENT_I_GAIN = 156 # [i_gain i_gain i_gain i_gain] gain / 1000
+
+    PARAM_ANTI_COGGING = 160
+    PARAM_ANTI_COGGING_TABLE = 161
+
+    PARAM_MAXIMUM_MOTOR_VOLTAGE = 170 # [V V] mv
+    PARAM_MAXIMUM_MOTOR_CURRENT = 171 # [A A] mA
+
+    PARAM_PHASE_RESISTANCE = 180 # [resistance, resistance] mOhms
+    PARAM_MOTOR_KV = 181 # [kv kv kv] rpm/V / 1000
+    PARAM_MOTOR_KT = 182 # [kt kt kt] Nm / 1000
+
+    PARAM_KP = 191 # [kp kp] Nm / rad error / 1000
+    PARAM_KPV = 192 # [kpv kpv] Nm / radps / 1000 
+    PARAM_KV = 193 # [kv kv] Nm / radps error / 1000
+
+    PARAM_P_MAX = 194 # [p_max p_max p_max p_max] rads/1000 SIGNED
+    PARAM_P_MIN = 195 # [p_max p_max p_max p_max] rads/1000 SIGNED
+
+    PARAM_V_MAX = 196 # [v_max v_max v_max v_max] radsps/1000 SIGNED
 
 
 
     def __init__(self, motor):
-        self.run_led_colors = [0, 255, 0]
         self.phase_resistance = 0
         self.encoder_offset = 0
         self.anti_cogging = 0
@@ -125,20 +146,19 @@ class Parameters:
 
     def __str__(self):
         output_string = "Motor parameters: \n"
-        output_string += f"Run led colors - {self.run_led_colors}"
         return output_string
-    
-
-    # def set_anti_cogging_table_entry(self, index, value):
-    #     self.motor.set_parameter()
 
 class Telemetry:
-    TELEM_DRIVE_STATE = 100
-    TELEM_MOTOR_POSITION = 101
-    TELEM_MOTOR_VELOCITY = 102
-    TELEM_MOTOR_PHASE_RESISTANCE = 110
-    TELM_MOTOR_TORQUE = 111
-    TELEM_MOTOR_VOLTAGE = 112
+    TELEM_DRIVE_STATE = 100 # [drive state, drive error]
+
+    TELEM_MOTOR_VOLTAGE = 101
+    TELEM_MOTOR_CURRENT = 102
+    TELEM_MOTOR_TORQUE = 103
+    TELEM_MOTOR_POSITION = 104
+    TELEM_MOTOR_VELOCITY = 105
+
+    TELEM_FET_TEMP = 110
+    TELEM_MOTOR_TEMP = 111
 
     def __init__(self, motor):
         self.motor = motor
@@ -150,40 +170,39 @@ class Telemetry:
         voltage_mv = bytes_to_int(data)
         return round(voltage_mv / 1000.0, 1)
     
-    def get_motor_position_encoder_raw(self):
-        data = self.motor.read_data(self.TELEM_MOTOR_POSITION)
-        position = bytes_to_int(data)
-        return position
+    def get_position_rads(self):
+        return  bytes_to_int(self.motor.read_data(self.TELEM_MOTOR_POSITION)) / 1000.0
     
-    def get_motor_velocity_encoder_raw(self):
-        data = self.motor.read_data(self.TELEM_MOTOR_VELOCITY)
-        position = bytes_to_int(data)
-        return position
-
-    def get_motor_position_revs(self):
-        return self.get_motor_position_encoder_raw() / 4096
-    
-    def get_motor_position_rads(self):
-        return self.get_motor_position_revs() * 2 * np.pi
+    def get_velocity_radsps(self):
+        return  bytes_to_int(self.motor.read_data(self.TELEM_MOTOR_VELOCITY)) / 1000.0
     
     def get_drive_state(self):
         return self.motor.read_data(self.TELEM_DRIVE_STATE)
 
     def get_motor_torque(self):
-        return bytes_to_int(self.motor.read_data(self.TELM_MOTOR_TORQUE))
+        return bytes_to_int(self.motor.read_data(self.TELEM_MOTOR_TORQUE))
 
 class Action:
-    ACTION_REQUEST_STATE_CHANGE = 20
-    ACTION_MOTOR_POSITION_SETPOINT = 51
+    ACTION_REQUEST_STATE_CHANGE = 20 # [new state]
+
+    ACTION_TORQUE_SETPOINT = 50 # [torque torque torque] Nm / 1000
+    ACTION_POSITION_SETPOINT = 51 # [pos pos pos] rads / 1000 # signed
+    ACTION_VELOCITY_SETPOINT = 52 # [vel vel vel] rads / 1000
 
     def __init__(self, motor):
         self.motor = motor
 
     def request_state_change(self, new_state):
         self.motor.send_array([self.ACTION_REQUEST_STATE_CHANGE, new_state])
+
+    def send_position_target(self, target):
+        self.motor.send_array([self.ACTION_TORQUE_SETPOINT] + int_to_bytes(3, target * 1000))
     
     def send_position_target(self, target):
-        self.motor.send_array([self.ACTION_MOTOR_POSITION_SETPOINT] + int_to_bytes(3, target))
+        self.motor.send_array([self.ACTION_POSITION_SETPOINT] + int_to_bytes(3, target * 1000))
+
+    def send_velocity_target(self, target):
+        self.motor.send_array([self.ACTION_VELOCITY_SETPOINT] + int_to_bytes(3, target * 1000))
 
 class FxFDrive:
     def __init__(self, can_bus, can_id, uid = None, name = "50x50Drive"):
@@ -272,6 +291,10 @@ class FxFDrive:
         """ Gets parameter data based on provided id """
         return self.read_data(parameter_id)
     
+    def get_parameter_int(self, parameter_id):
+        """ Gets parameter as an int based on provided id """
+        return bytes_to_int(self.read_data(parameter_id))
+    
     def set_parameter(self, parameter_id, parameter_value):
         """ Sets parameter based on provided id and value"""
         for x in range(RETRY_TIMEOUT):
@@ -311,12 +334,11 @@ class FxFDrive:
 
     def read_parameters(self):
         """ Reads out all parameters and updates values """
-        self.parameters.run_led_colors = self.get_parameter(self.parameters.PARAM_LED_COLOR)
         self.parameters.phase_resistance = bytes_to_int(self.get_parameter(self.parameters.PARAM_PHASE_RESISTANCE)) / 1000.0
         self.parameters.anti_cogging = bytes_to_int(self.get_parameter(self.parameters.PARAM_ANTI_COGGING))
         self.parameters.encoder_offset = bytes_to_int(self.get_parameter(self.parameters.PARAM_ENCODER_OFFSET))
         # self.parameters.current_gain = bytes_to_int(self.get_parameter(self.parameters.PARAM_CURRENT_GAIN))
-        self.parameters.current_limit = bytes_to_int(self.get_parameter(self.parameters.PARAM_CURRENT_LIMIT))
+        self.parameters.current_limit = bytes_to_int(self.get_parameter(self.parameters.PARAM_MAXIMUM_MOTOR_CURRENT))
         # self.parameters.position_gain = bytes_to_int(self.get_parameter(self.parameters.PARAM_POSITION_GAIN))
         return self.parameters
 
