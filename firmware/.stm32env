@@ -2,6 +2,6 @@
 # Other environment variables can be added here. If wanting to use the generated makefile in CI/CD context please
 # configure the following variables: GCC_PATH, OPENOCD
 
-ARM_GCC_PATH = /Users/thomasg/Library/Application Support/Code/User/globalStorage/bmd.stm32-for-vscode/@xpack-dev-tools/arm-none-eabi-gcc/12.2.1-1.2.1/.content/bin
-OPENOCD = /Users/thomasg/Library/Application Support/Code/User/globalStorage/bmd.stm32-for-vscode/@xpack-dev-tools/openocd/0.12.0-1.1/.content/bin/openocd
+ARM_GCC_PATH = C:\Program Files (x86)\GNU Arm Embedded Toolchain\10 2021.10\bin
+OPENOCD = C:\Users\Angus French\Documents\openocd\OpenOCD-20240916-0.12.0\bin\openocd
  
