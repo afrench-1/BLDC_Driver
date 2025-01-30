@@ -387,7 +387,7 @@ void calibrate_encoder(float voltage){
     // float ratio_estimate = (4096.0 / ((float)finishing_angle - (float)starting_angle) * electrical_turns);
     // electrical_mechanical_ratio = roundf(ratio_estimate);
 
-    electrical_mechanical_ratio = 21;
+    electrical_mechanical_ratio = 7;
 
     // Spin forward
     for(int i = 0; i<=256 * 2; i++){

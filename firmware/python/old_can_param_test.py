@@ -5,8 +5,7 @@ import time
 
 COM_PORT = None
 for port in list_ports.comports():
-    if(port.description == "50x50-Drive"):
-        COM_PORT = port.device
+    COM_PORT = port.device
 
 if(COM_PORT == None):
     raise Exception("No interface found")

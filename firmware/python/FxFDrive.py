@@ -68,8 +68,7 @@ def make_can_bus():
     """ Finds attached 50x50-Drive and opens it as a SLCAN interface """
     COM_PORT = None
     for port in list_ports.comports():
-        if(port.description == "50x50-Drive"):
-            COM_PORT = port.device
+        COM_PORT = port.device
 
     if(COM_PORT == None):
         raise Exception("No interface found")
@@ -195,7 +194,7 @@ class Action:
     def request_state_change(self, new_state):
         self.motor.send_array([self.ACTION_REQUEST_STATE_CHANGE, new_state])
 
-    def send_position_target(self, target):
+    def send_torque_target(self, target):
         self.motor.send_array([self.ACTION_TORQUE_SETPOINT] + int_to_bytes(3, target * 1000))
     
     def send_position_target(self, target):

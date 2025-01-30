@@ -99,8 +99,8 @@ class GUI(object):
                             #     self.drive.set_parameter_int(self.drive.parameters.PARAM_ENCODER_OFFSET, 49, 1)
 
             drive_voltage = self.drive.telemetry.get_motor_voltage_V()
-            motor_position = self.drive.telemetry.get_motor_position_revs()
-            motor_velocity = self.drive.telemetry.get_motor_velocity_encoder_raw()
+            motor_position = self.drive.telemetry.get_position_rads()
+            motor_velocity = self.drive.telemetry.get_velocity_radsps()
             drive_state, drive_error = self.drive.telemetry.get_drive_state()
             motor_torque = self.drive.telemetry.get_motor_torque()
 
@@ -163,7 +163,7 @@ class GUI(object):
             changed, self.drive.parameters.current_limit = imgui.drag_int(
                 "Current Limit", self.drive.parameters.current_limit,  0.1, 0.0, 0.0, "%f mA"
             )
-
+            
             if(changed):
                 print(int_to_bytes(2, self.drive.parameters.current_limit, False))
                 self.drive.set_parameter(drive.parameters.PARAM_CURRENT_LIMIT, int_to_bytes(2, self.drive.parameters.current_limit, False))
@@ -174,7 +174,10 @@ class GUI(object):
                 # print(self.drive.parameters.anti_cogging)
                 self.drive.set_parameter(drive.parameters.PARAM_ANTI_COGGING, self.drive.parameters.anti_cogging)
 
+            changed, self.drive.action.send_position_target = imgui.checkbox("move", self.drive.action.send_position_target)
 
+            if(changed):
+                self.drive.action.send_position_target(0)
 
             # if imgui.tree_node("Configuration"):
             #     imgui.text("lol")

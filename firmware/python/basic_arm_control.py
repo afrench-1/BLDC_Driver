@@ -19,28 +19,28 @@ startup_write = True
 
 if(startup_write):
     print("Writing encoder offsets")
-    shoulder.set_parameter_int(shoulder.parameters.PARAM_ENCODER_OFFSET, -98, 1)
-    elbow.set_parameter_int(elbow.parameters.PARAM_ENCODER_OFFSET, 49, 1)
+    #shoulder.set_parameter_int(shoulder.parameters.PARAM_ENCODER_OFFSET, -98, 1)
+    #elbow.set_parameter_int(elbow.parameters.PARAM_ENCODER_OFFSET, 49, 1)
 
     print("Writing anti-cogging tables")
     for i, value in enumerate(elbow_anti_cogging):
         value = [i] + int_to_bytes(2, value)
-        elbow.set_parameter(elbow.parameters.PARAM_ANTI_COGGING_TABLE, value)
+        #elbow.set_parameter(elbow.parameters.PARAM_ANTI_COGGING_TABLE, value)
 
     for i, value in enumerate(shoulder_anti_cogging):
         value = [i] + int_to_bytes(2, value)
-        shoulder.set_parameter(shoulder.parameters.PARAM_ANTI_COGGING_TABLE, value)
+        #shoulder.set_parameter(shoulder.parameters.PARAM_ANTI_COGGING_TABLE, value)
     print("Done")
 
 time.sleep(0.1)
 
 print("Setting parameters")
-shoulder.set_parameter_int(shoulder.parameters.PARAM_CURRENT_LIMIT, 10000, 2)
-elbow.set_parameter_int(elbow.parameters.PARAM_CURRENT_LIMIT, 10000, 2)
-wrist.set_parameter_int(wrist.parameters.PARAM_CURRENT_LIMIT, 9000, 2)
+#shoulder.set_parameter_int(shoulder.parameters.PARAM_CURRENT_LIMIT, 10000, 2)
+#elbow.set_parameter_int(elbow.parameters.PARAM_CURRENT_LIMIT, 10000, 2)
+#wrist.set_parameter_int(wrist.parameters.PARAM_CURRENT_LIMIT, 9000, 2)
 
-shoulder.set_parameter_int(shoulder.parameters.PARAM_ANTI_COGGING, 1, 1)
-elbow.set_parameter_int(elbow.parameters.PARAM_ANTI_COGGING, 1, 1)
+#shoulder.set_parameter_int(shoulder.parameters.PARAM_ANTI_COGGING, 1, 1)
+#elbow.set_parameter_int(elbow.parameters.PARAM_ANTI_COGGING, 1, 1)
 
 input("Idle drivers?")
 shoulder.action.request_state_change(DriveState.drive_state_idle.value)

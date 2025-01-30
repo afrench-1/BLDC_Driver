@@ -12,7 +12,7 @@ time.sleep(0.1)
 print("Encoder calibration")
 drive.action.request_state_change(DriveState.drive_state_encoder_calibration.value)
 
-# drive.action.request_state_change(DriveState.drive_state_anti_cogging_calibration.value)
+#drive.action.request_state_change(DriveState.drive_state_anti_cogging_calibration.value)
 
 while(drive.telemetry.get_drive_state()[0] != DriveState.drive_state_disabled.value):
     time.sleep(1.0)

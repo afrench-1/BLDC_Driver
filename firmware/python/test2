@@ -13,38 +13,29 @@ print("Started...")
 motor.action.request_state_change(DriveState.drive_state_idle.value)
 
 input("Enable control?")
-motor.action.request_state_change(DriveState.drive_state_velocity_control.value)
+motor.action.request_state_change(DriveState.drive_state_position_control.value)
 
 motor.action.send_position_target(0)
 
-motor.set_parameter_int(motor.parameters.PARAM_KP, 3_000, 3)
-print(motor.get_parameter_int(motor.parameters.PARAM_KP))
+motor.set_parameter_int(motor.parameters.PARAM_KP, 1_000, 3)
 # motor.set_parameter_int(motor.pa)
-motor.set_parameter_int(motor.parameters.PARAM_KV, 90, 3)
+motor.set_parameter_int(motor.parameters.PARAM_KV, 210, 3)
 print(motor.get_parameter_int(motor.parameters.PARAM_KV))
-motor.set_parameter_int(motor.parameters.PARAM_MAXIMUM_MOTOR_CURRENT, 15_000, 2)
-print(motor.get_parameter_int(motor.parameters.PARAM_MAXIMUM_MOTOR_CURRENT))
+motor.set_parameter_int(motor.parameters.PARAM_MAXIMUM_MOTOR_CURRENT, 3_000, 2)
 
 input("Run")
-motor.action.send_velocity_target(2)
+motor.action.send_position_target(100 / 9.55)
 
 try:
     while(True):
-        print(motor.telemetry.get_velocity_radsps())
-        time.sleep(0.03)
+        print(motor.telemetry.get_position_rads())
+        time.sleep(0.01)
 
 except KeyboardInterrupt:
     pass
 
 input("Stop")
 motor.action.send_velocity_target(0.0)
-
-for i in range(5):
-    input("move to first target")
-    motor.action.send_position_target(int(2 * 3.1415 * 1000 * 2))
-
-    input("move to second target")
-    motor.action.send_position_target(0)
 
 
 input("shutdown")
